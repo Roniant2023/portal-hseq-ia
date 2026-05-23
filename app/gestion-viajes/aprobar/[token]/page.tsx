@@ -2,12 +2,15 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 export default function TravelApprovalPage() {
   const params = useParams();
   const token = String(params?.token || "");
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const pdfRef = useRef<HTMLDivElement | null>(null);
 
   const [drawing, setDrawing] = useState(false);
   const [signature, setSignature] = useState("");
@@ -19,34 +22,45 @@ export default function TravelApprovalPage() {
   const [travel, setTravel] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-function getPos(e: any) {
-  const canvas = canvasRef.current!;
-  const rect = canvas.getBoundingClientRect();
+  function getPos(e: any) {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
 
-  const touch = e.touches?.[0];
+    const touch = e.touches?.[0];
 
-  const clientX = touch ? touch.clientX : e.clientX;
-  const clientY = touch ? touch.clientY : e.clientY;
+    const clientX = touch ? touch.clientX : e.clientX;
+    const clientY = touch ? touch.clientY : e.clientY;
 
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
-  return {
-    x: (clientX - rect.left) * scaleX,
-    y: (clientY - rect.top) * scaleY,
-  };
-}
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  }
 
   function startDraw(e: any) {
     e.preventDefault();
 
-    setDrawing(true);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    const ctx = canvasRef.current?.getContext("2d");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
     const pos = getPos(e);
 
-    ctx?.beginPath();
-    ctx?.moveTo(pos.x, pos.y);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.lineTo(pos.x, pos.y);
+
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#111";
+    ctx.stroke();
+
+    setDrawing(true);
   }
 
   function draw(e: any) {
@@ -55,9 +69,9 @@ function getPos(e: any) {
     e.preventDefault();
 
     const ctx = canvasRef.current?.getContext("2d");
-    const pos = getPos(e);
-
     if (!ctx) return;
+
+    const pos = getPos(e);
 
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
@@ -70,8 +84,7 @@ function getPos(e: any) {
   function endDraw() {
     setDrawing(false);
 
-    const data =
-      canvasRef.current?.toDataURL("image/png") || "";
+    const data = canvasRef.current?.toDataURL("image/png") || "";
 
     setSignature(data);
   }
@@ -87,6 +100,61 @@ function getPos(e: any) {
     setSignature("");
   }
 
+  async function handleGeneratePdf() {
+    try {
+      if (!pdfRef.current) return;
+
+      const canvas = await html2canvas(pdfRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        allowTaint: true,
+        foreignObjectRendering: false,
+        onclone: (clonedDoc) => {
+          clonedDoc.querySelectorAll("*").forEach((el: any) => {
+            el.style.color = "#171717";
+            el.style.backgroundColor = "#ffffff";
+            el.style.borderColor = "#d4d4d4";
+            el.style.boxShadow = "none";
+          });
+        },
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+
+        pdf.addPage();
+
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`gestion-viaje-${travel?.travel_code || "aprobada"}.pdf`);
+    } catch (err) {
+      console.error(err);
+      setUiError("No se pudo generar el PDF.");
+    }
+  }
+
   async function handleApprove() {
     try {
       setSaving(true);
@@ -94,43 +162,31 @@ function getPos(e: any) {
       setUiInfo("");
 
       if (!signature) {
-        setUiError(
-          "Debes registrar la firma antes de aprobar."
-        );
+        setUiError("Debes registrar la firma antes de aprobar.");
         return;
       }
 
-      const res = await fetch(
-        "/api/sign-travel-approval",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            token: token,
-            signature_data: signature,
-          }),
-        }
-      );
+      const res = await fetch("/api/sign-travel-approval", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token: token,
+          signature_data: signature,
+        }),
+      });
 
       const data = await res.json();
 
       if (!res.ok || !data?.ok) {
-        setUiError(
-          data?.error ||
-            "No se pudo guardar la aprobación."
-        );
+        setUiError(data?.error || "No se pudo guardar la aprobación.");
         return;
       }
 
-      setUiInfo(
-        "✅ Viaje aprobado correctamente."
-      );
+      setUiInfo("✅ Viaje aprobado correctamente.");
     } catch (err: any) {
-      setUiError(
-        err?.message || "Error aprobando viaje."
-      );
+      setUiError(err?.message || "Error aprobando viaje.");
     } finally {
       setSaving(false);
     }
@@ -148,36 +204,26 @@ function getPos(e: any) {
   useEffect(() => {
     async function loadTravel() {
       try {
-        const res = await fetch(
-          "/api/get-travel-approval",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              token: token,
-            }),
-          }
-        );
+        const res = await fetch("/api/get-travel-approval", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token: token,
+          }),
+        });
 
         const data = await res.json();
 
         if (!res.ok || !data?.ok) {
-          setUiError(
-            data?.error ||
-              "No se pudo cargar la gestión de viaje."
-          );
+          setUiError(data?.error || "No se pudo cargar la gestión de viaje.");
           return;
         }
 
         setTravel(data.travel);
       } catch (err: any) {
-        setUiError(
-          err?.message ||
-            "Error cargando gestión de viaje."
-        );
+        setUiError(err?.message || "Error cargando gestión de viaje.");
       } finally {
         setLoading(false);
       }
@@ -187,15 +233,12 @@ function getPos(e: any) {
   }, [token]);
 
   return (
-    <main className="max-w-xl mx-auto p-6 space-y-5">
+    <main ref={pdfRef} className="max-w-xl mx-auto p-6 space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">
-          Aprobación de viaje
-        </h1>
+        <h1 className="text-2xl font-semibold">Aprobación de viaje</h1>
 
         <p className="text-sm text-neutral-600">
-          Registra tu firma para autorizar la
-          gestión de viaje.
+          Registra tu firma para autorizar la gestión de viaje.
         </p>
       </div>
 
@@ -219,89 +262,71 @@ function getPos(e: any) {
 
       {travel && (
         <section className="border rounded-xl p-4 bg-white space-y-3">
-          <div className="font-semibold">
-            Resumen de la gestión de viaje
-          </div>
+          <div className="font-semibold">Resumen de la gestión de viaje</div>
 
           <div className="grid grid-cols-1 gap-2 text-sm">
             <div>
-              <b>Código:</b>{" "}
-              {travel.travel_code || "—"}
+              <b>Código:</b> {travel.travel_code || "—"}
             </div>
 
             <div>
-              <b>Conductor:</b>{" "}
-              {travel.driver_json?.name || "—"}
+              <b>Conductor:</b> {travel.driver_json?.name || "—"}
             </div>
 
             <div>
-              <b>Empresa:</b>{" "}
-              {travel.driver_json?.company || "—"}
+              <b>Empresa:</b> {travel.driver_json?.company || "—"}
             </div>
 
             <div>
               <b>Vehículo:</b>{" "}
-              {(travel.vehicle_json?.brand ||
-                "—") +
+              {(travel.vehicle_json?.brand || "—") +
                 " / " +
-                (travel.vehicle_json?.type ||
-                  "—") +
+                (travel.vehicle_json?.type || "—") +
                 " / " +
-                (travel.vehicle_json?.plate ||
-                  "—")}
+                (travel.vehicle_json?.plate || "—")}
             </div>
 
             <div>
-              <b>Origen:</b>{" "}
-              {travel.trip_json?.origin || "—"}
+              <b>Origen:</b> {travel.trip_json?.origin || "—"}
             </div>
 
             <div>
-              <b>Destino:</b>{" "}
-              {travel.trip_json?.destination ||
-                "—"}
+              <b>Destino:</b> {travel.trip_json?.destination || "—"}
             </div>
 
             <div>
               <b>Fecha salida:</b>{" "}
-              {travel.trip_json
-                ?.departureDateTime || "—"}
+              {travel.trip_json?.departureDateTime || "—"}
             </div>
 
             <div>
-              <b>Motivo:</b>{" "}
-              {travel.trip_json?.reason || "—"}
+              <b>Motivo:</b> {travel.trip_json?.reason || "—"}
             </div>
 
             <div>
-              <b>Total riesgo:</b>{" "}
-              {travel.risk_json?.total ?? "—"}
+              <b>Total riesgo:</b> {travel.risk_json?.total ?? "—"}
             </div>
 
             <div>
-              <b>Nivel:</b>{" "}
-              {travel.risk_json?.level || "—"}
+              <b>Nivel:</b> {travel.risk_json?.level || "—"}
             </div>
 
             <div>
               <b>Autorización requerida:</b>{" "}
-              {travel.risk_json
-                ?.authorization || "—"}
+              {travel.risk_json?.authorization || "—"}
             </div>
           </div>
         </section>
       )}
 
       <section className="border rounded-xl p-4 bg-white space-y-3">
-        <div className="font-semibold">
-          Firma del aprobador
-        </div>
+        <div className="font-semibold">Firma del aprobador</div>
 
         <canvas
           ref={canvasRef}
           className="w-full border rounded bg-white touch-none"
-width={900}
-height={220}
+          width={900}
+          height={220}
           onMouseDown={startDraw}
           onMouseMove={draw}
           onMouseUp={endDraw}
@@ -326,25 +351,32 @@ height={220}
             disabled={saving}
             className="px-4 py-2 bg-green-700 text-white rounded disabled:opacity-50"
           >
-            {saving
-              ? "Guardando..."
-              : "Aprobar viaje"}
+            {saving ? "Guardando..." : "Aprobar viaje"}
           </button>
         </div>
       </section>
 
-{uiInfo && (
-  <section className="border rounded-xl p-4 bg-green-50 border-green-200">
-    <div className="text-green-800 font-semibold text-lg">
-      ✅ VIAJE APROBADO
-    </div>
+      {uiInfo && (
+        <section className="border rounded-xl p-4 bg-green-50 border-green-200 space-y-4">
+          <div>
+            <div className="text-green-800 font-semibold text-lg">
+              ✅ VIAJE APROBADO
+            </div>
 
-    <div className="text-sm text-green-700 mt-1">
-      La aprobación remota fue registrada correctamente.
-    </div>
-  </section>
-)}
+            <div className="text-sm text-green-700 mt-1">
+              La aprobación remota fue registrada correctamente.
+            </div>
+          </div>
 
-</main>
+          <button
+            type="button"
+            onClick={handleGeneratePdf}
+            className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-800"
+          >
+            Descargar PDF aprobado
+          </button>
+        </section>
+      )}
+    </main>
   );
 }
