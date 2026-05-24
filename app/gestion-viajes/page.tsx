@@ -145,16 +145,21 @@ export default function GestionViajesPage() {
     phone: "",
   });
 
-  const [trip, setTrip] = useState({
-    reason: "",
-    departureDateTime: "",
-    origin: "",
-    destination: "",
-    arrivalDateTime: "",
-    cargoType: "",
-    kilometers: "",
-    authorizedRoute: "",
-  });
+ const [trip, setTrip] = useState({
+  reason: "",
+  departureDateTime: "",
+  origin: "",
+  originLat: "",
+  originLon: "",
+  destination: "",
+  destinationLat: "",
+  destinationLon: "",
+  arrivalDateTime: "",
+  cargoType: "",
+  kilometers: "",
+  estimatedDurationMinutes: "",
+  authorizedRoute: "",
+});
 
   const [documents, setDocuments] = useState<Record<string, boolean>>({
     propertyCard: false,
@@ -276,6 +281,105 @@ export default function GestionViajesPage() {
   function updateRisk(key: string, value: string | boolean) {
     setRisk((prev) => ({ ...prev, [key]: value }));
   }
+async function handleCalculateRoute() {
+  try {
+    setUiError(null);
+    setUiInfo(null);
+
+    if (!trip.origin.trim() || !trip.destination.trim()) {
+      setUiError("Debes diligenciar origen y destino para calcular la ruta.");
+      return;
+    }
+
+    const res = await fetch("/api/calculate-route", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        origin: trip.origin,
+        destination: trip.destination,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data?.ok) {
+      setUiError(data?.error || "No se pudo calcular la ruta.");
+      return;
+    }
+
+   setTrip((prev) => {
+  let calculatedArrival = prev.arrivalDateTime;
+
+  const drivingMinutes = Number(data.duration_minutes);
+
+let totalTravelMinutes = drivingMinutes;
+
+// Descanso de 20 min cada 2 horas
+const restBlocks = Math.floor(drivingMinutes / 120);
+const restMinutes = restBlocks * 20;
+
+totalTravelMinutes += restMinutes;
+
+// Turnos de 12 horas
+// Máximo 8 horas manejando por turno
+const drivingShifts = Math.floor(drivingMinutes / 480);
+
+// Descanso obligatorio entre turnos: 8 horas
+const mandatoryRestMinutes = drivingShifts * 480;
+
+totalTravelMinutes += mandatoryRestMinutes;
+
+  if (prev.departureDateTime) {
+    const departure = new Date(prev.departureDateTime);
+
+    const arrival = new Date(departure);
+
+    // Sumar conducción + descansos
+    arrival.setMinutes(
+      arrival.getMinutes() + totalTravelMinutes
+    );
+
+    // Validar cruce de almuerzo (12:00 m)
+    const lunchTime = new Date(departure);
+
+    lunchTime.setHours(12, 0, 0, 0);
+
+    if (
+      departure <= lunchTime &&
+      arrival >= lunchTime
+    ) {
+      arrival.setMinutes(arrival.getMinutes() + 60);
+
+      totalTravelMinutes += 60;
+    }
+
+    calculatedArrival = arrival
+      .toISOString()
+      .slice(0, 16);
+  }
+
+  return {
+    ...prev,
+    originLat: String(data.origin_coords.lat),
+    originLon: String(data.origin_coords.lon),
+    destinationLat: String(data.destination_coords.lat),
+    destinationLon: String(data.destination_coords.lon),
+    kilometers: String(data.distance_km),
+    estimatedDurationMinutes: String(totalTravelMinutes),
+    arrivalDateTime: calculatedArrival,
+  };
+});
+
+
+    setUiInfo(
+      `✅ Ruta calculada: ${data.distance_km} km · ${data.duration_minutes} min aprox.`
+    );
+  } catch (err: any) {
+    setUiError(err?.message || "Error calculando la ruta.");
+  }
+}
 
   function getDriverPos(e: any) {
     const canvas = driverCanvasRef.current!;
@@ -725,12 +829,38 @@ export default function GestionViajesPage() {
             value={trip.origin}
             onChange={(e) => updateTrip("origin", e.target.value)}
           />
+<input
+  className="border p-2 rounded"
+  placeholder="Latitud origen"
+  value={trip.originLat}
+  onChange={(e) => updateTrip("originLat", e.target.value)}
+/>
+
+<input
+  className="border p-2 rounded"
+  placeholder="Longitud origen"
+  value={trip.originLon}
+  onChange={(e) => updateTrip("originLon", e.target.value)}
+/>
           <input
             className="border p-2 rounded"
             placeholder="Destino"
             value={trip.destination}
             onChange={(e) => updateTrip("destination", e.target.value)}
           />
+<input
+  className="border p-2 rounded"
+  placeholder="Latitud destino"
+  value={trip.destinationLat}
+  onChange={(e) => updateTrip("destinationLat", e.target.value)}
+/>
+
+<input
+  className="border p-2 rounded"
+  placeholder="Longitud destino"
+  value={trip.destinationLon}
+  onChange={(e) => updateTrip("destinationLon", e.target.value)}
+/>
           <input
             className="border p-2 rounded"
             type="datetime-local"
@@ -749,6 +879,12 @@ export default function GestionViajesPage() {
             value={trip.kilometers}
             onChange={(e) => updateTrip("kilometers", e.target.value)}
           />
+<input
+  className="border p-2 rounded bg-neutral-50"
+  placeholder="Tiempo estimado ruta (min)"
+  value={trip.estimatedDurationMinutes}
+  readOnly
+/>
           <input
             className="border p-2 rounded md:col-span-2"
             placeholder="Ruta / camino autorizado"
@@ -756,6 +892,13 @@ export default function GestionViajesPage() {
             onChange={(e) => updateTrip("authorizedRoute", e.target.value)}
           />
         </div>
+<button
+  type="button"
+  onClick={handleCalculateRoute}
+  className="px-4 py-2 bg-blue-700 text-white rounded"
+>
+  Calcular ruta automáticamente
+</button>
       </section>
 
       <section className="border rounded-xl p-4 space-y-3 bg-white shadow-sm">
@@ -1104,7 +1247,8 @@ function RiskSelect({
   value: string;
   options: Option[];
   onChange: (value: string) => void;
-}) {
+}) 
+{
   return (
     <div className="border rounded p-3">
       <label className="text-sm font-semibold">{title}</label>
