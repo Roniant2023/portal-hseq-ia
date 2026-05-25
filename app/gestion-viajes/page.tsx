@@ -806,102 +806,76 @@ totalTravelMinutes += mandatoryRestMinutes;
           ))}
         </div>
       </section>
+<section className="border rounded-xl p-4 space-y-4 bg-white shadow-sm">
+  <h2 className="text-lg font-semibold">Datos del viaje</h2>
 
-      <section className="border rounded-xl p-4 space-y-3 bg-white shadow-sm">
-        <h2 className="text-lg font-semibold">Datos del viaje</h2>
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    {[
+      ["Motivo del viaje", trip.reason, "reason", false],
+      ["Fecha y hora de inicio", trip.departureDateTime, "departureDateTime", true],
+      ["Origen", trip.origin, "origin", false],
+      ["Destino", trip.destination, "destination", false],
+      ["Fecha y hora estimada de llegada", trip.arrivalDateTime, "arrivalDateTime", true],
+      ["Tipo de carga que transporta", trip.cargoType, "cargoType", false],
+    ].map(([label, value, key, isDate]: any) => (
+      <div key={key} className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-neutral-600">{label}</label>
+        <input
+          className="h-12 border p-3 rounded-lg"
+          type={isDate ? "datetime-local" : "text"}
+          value={value}
+          onChange={(e) => updateTrip(key, e.target.value)}
+        />
+      </div>
+    ))}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input
-            className="border p-2 rounded"
-            placeholder="Motivo del viaje"
-            value={trip.reason}
-            onChange={(e) => updateTrip("reason", e.target.value)}
-          />
-          <input
-            className="border p-2 rounded"
-            type="datetime-local"
-            value={trip.departureDateTime}
-            onChange={(e) => updateTrip("departureDateTime", e.target.value)}
-          />
-          <input
-            className="border p-2 rounded"
-            placeholder="Origen"
-            value={trip.origin}
-            onChange={(e) => updateTrip("origin", e.target.value)}
-          />
-<input
-  className="border p-2 rounded"
-  placeholder="Latitud origen"
-  value={trip.originLat}
-  onChange={(e) => updateTrip("originLat", e.target.value)}
-/>
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-neutral-600">
+        Kilómetros a recorrer
+      </label>
+      <input
+        className="h-12 border p-3 rounded-lg bg-neutral-50"
+        value={trip.kilometers}
+        readOnly
+      />
+    </div>
 
-<input
-  className="border p-2 rounded"
-  placeholder="Longitud origen"
-  value={trip.originLon}
-  onChange={(e) => updateTrip("originLon", e.target.value)}
-/>
-          <input
-            className="border p-2 rounded"
-            placeholder="Destino"
-            value={trip.destination}
-            onChange={(e) => updateTrip("destination", e.target.value)}
-          />
-<input
-  className="border p-2 rounded"
-  placeholder="Latitud destino"
-  value={trip.destinationLat}
-  onChange={(e) => updateTrip("destinationLat", e.target.value)}
-/>
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-neutral-600">
+        Tiempo estimado total en ruta
+      </label>
+      <input
+        className="h-12 border p-3 rounded-lg bg-neutral-50"
+        value={
+          trip.estimatedDurationMinutes
+            ? `${(Number(trip.estimatedDurationMinutes) / 60).toFixed(1)} horas`
+            : ""
+        }
+        readOnly
+      />
+    </div>
 
-<input
-  className="border p-2 rounded"
-  placeholder="Longitud destino"
-  value={trip.destinationLon}
-  onChange={(e) => updateTrip("destinationLon", e.target.value)}
-/>
-          <input
-            className="border p-2 rounded"
-            type="datetime-local"
-            value={trip.arrivalDateTime}
-            onChange={(e) => updateTrip("arrivalDateTime", e.target.value)}
-          />
-          <input
-            className="border p-2 rounded"
-            placeholder="Tipo de carga que transporta"
-            value={trip.cargoType}
-            onChange={(e) => updateTrip("cargoType", e.target.value)}
-          />
-          <input
-            className="border p-2 rounded"
-            placeholder="Km a recorrer"
-            value={trip.kilometers}
-            onChange={(e) => updateTrip("kilometers", e.target.value)}
-          />
-<input
-  className="border p-2 rounded bg-neutral-50"
-  placeholder="Tiempo estimado ruta (min)"
-  value={trip.estimatedDurationMinutes}
-  readOnly
-/>
-          <input
-            className="border p-2 rounded md:col-span-2"
-            placeholder="Ruta / camino autorizado"
-            value={trip.authorizedRoute}
-            onChange={(e) => updateTrip("authorizedRoute", e.target.value)}
-          />
-        </div>
-<button
-  type="button"
-  onClick={handleCalculateRoute}
-  className="px-4 py-2 bg-blue-700 text-white rounded"
->
-  Calcular ruta automáticamente
-</button>
-      </section>
+    <div className="flex flex-col gap-1 md:col-span-3">
+      <label className="text-xs font-medium text-neutral-600">
+        Ruta / camino autorizado
+      </label>
+      <input
+        className="h-12 border p-3 rounded-lg"
+        value={trip.authorizedRoute}
+        onChange={(e) => updateTrip("authorizedRoute", e.target.value)}
+      />
+    </div>
+  </div>
 
-      <section className="border rounded-xl p-4 space-y-3 bg-white shadow-sm">
+  <button
+    type="button"
+    onClick={handleCalculateRoute}
+    className="mt-4 h-11 px-5 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800 transition"
+  >
+    Calcular ruta automáticamente
+  </button>
+</section>
+          <section className="border rounded-xl p-4 space-y-3 bg-white shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">Inspección abreviada pre-viaje</h2>
