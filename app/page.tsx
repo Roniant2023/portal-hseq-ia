@@ -4,8 +4,8 @@ const programs = [
   {
     title: "Control de Trabajo",
     icon: "/icons/control-trabajo.png",
-    href: "https://ats-piloto-eies.vercel.app/ats",
-    external: true,
+    href: "/control-trabajo",
+external: false,
   },
   {
     title: "Trabajo en Alturas",
