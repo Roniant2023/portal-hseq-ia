@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ServiceWorkerRegister from "./ServiceWorkerRegister";
 import "./globals.css";
@@ -17,11 +17,14 @@ export const metadata: Metadata = {
   title: "Portal HSEQ IA",
   description: "Portal inteligente para gestión HSEQ",
   manifest: "/manifest.json",
-  themeColor: "#111827",
   icons: {
     icon: "/icon-192.png",
     apple: "/icon-192.png",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#111827",
 };
 
 export default function RootLayout({
