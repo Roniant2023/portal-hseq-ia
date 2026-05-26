@@ -4,12 +4,12 @@ const tools = [
   {
     title: "ATS Digital",
     description: "Análisis de Trabajo Seguro con apoyo de inteligencia artificial.",
-    href: "https://ats-piloto-eies.vercel.app/ats",
+    href: "https://ats-piloto-eies.vercel.app",
   },
   {
     title: "Tarjetas de Observación SOE",
     description: "Registro de observaciones HSEQ, evidencias y seguimiento.",
-    href: "https://soe-inteligente.vercel.app",
+    href: "https://soe-inteligente.vercel.app/soe",
   },
 ];
 
