@@ -82,60 +82,55 @@ export default function HeightEquipmentPage() {
     return baseDate.toISOString().slice(0, 10);
   }
 
-  function getCertificationStatus(expiryDate: string, status: string) {
-    if (status === "OUT_OF_SERVICE") {
-      return {
-        label: "FUERA DE SERVICIO",
-        className: "bg-red-600 text-white",
-      };
-    }
-
-    if (!expiryDate) {
-      return {
-        label: "SIN FECHA",
-        className: "bg-neutral-500 text-white",
-      };
-    }
-
-    const today = new Date();
-    const expiry = new Date(expiryDate);
-    const diffDays = Math.ceil(
-      (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (diffDays < 0) {
-      return {
-        label: "CERTIFICACIÓN VENCIDA",
-        className: "bg-black text-white",
-      };
-    }
-
-    if (diffDays <= 15) {
-      return {
-        label: `VENCE EN ${diffDays} DÍAS`,
-        className: "bg-red-600 text-white",
-      };
-    }
-
-    if (diffDays <= 30) {
-      return {
-        label: `VENCE EN ${diffDays} DÍAS`,
-        className: "bg-orange-500 text-white",
-      };
-    }
-
-    if (diffDays <= 60) {
-      return {
-        label: `VENCE EN ${diffDays} DÍAS`,
-        className: "bg-yellow-500 text-black",
-      };
-    }
-
+  function getCertificationStatus(expiryDate: string) {
+  if (!expiryDate) {
     return {
-      label: "VIGENTE",
-      className: "bg-green-600 text-white",
+      label: "SIN FECHA",
+      className: "bg-neutral-500 text-white",
     };
   }
+
+  const today = new Date();
+  const expiry = new Date(expiryDate);
+
+  const diffDays = Math.ceil(
+    (expiry.getTime() - today.getTime()) /
+      (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays < 0) {
+    return {
+      label: "CERTIFICACIÓN VENCIDA",
+      className: "bg-black text-white",
+    };
+  }
+
+  if (diffDays <= 15) {
+    return {
+      label: `VENCE EN ${diffDays} DÍAS`,
+      className: "bg-red-600 text-white",
+    };
+  }
+
+  if (diffDays <= 30) {
+    return {
+      label: `VENCE EN ${diffDays} DÍAS`,
+      className: "bg-orange-500 text-white",
+    };
+  }
+
+  if (diffDays <= 60) {
+    return {
+      label: `VENCE EN ${diffDays} DÍAS`,
+      className: "bg-yellow-500 text-black",
+    };
+  }
+
+  return {
+    label: "CERTIFICACIÓN VIGENTE",
+    className: "bg-green-600 text-white",
+  };
+}
 
   async function uploadMainPhoto() {
     if (!mainPhoto) return "";
@@ -631,9 +626,8 @@ export default function HeightEquipmentPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {equipment.map((item) => {
               const certStatus = getCertificationStatus(
-                item.certification_expiry_date,
-                item.status
-              );
+  item.certification_expiry_date
+);
 
               return (
                 <div
@@ -698,7 +692,7 @@ export default function HeightEquipmentPage() {
 
                   <div className="text-sm">
                     <b>Caducidad:</b>{" "}
-                    <span
+                    
                       className={
                         certStatus.label.includes("VENCIDA")
                           ? "text-red-600 font-bold"
@@ -713,11 +707,32 @@ export default function HeightEquipmentPage() {
                     </span>
                   </div>
 
-                  <span
-                    className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${certStatus.className}`}
-                  >
-                    {certStatus.label}
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+
+  {/* Estado operativo */}
+  <span
+    className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+      item.status === "OUT_OF_SERVICE"
+        ? "bg-red-700 text-white"
+        : "bg-green-700 text-white"
+    }`}
+  >
+    {item.status === "OUT_OF_SERVICE"
+      ? "FUERA DE SERVICIO"
+      : "EN SERVICIO"}
+  </span>
+
+  {/* Estado certificación */}
+  <span
+    className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+      certStatus.className
+    }`}
+  >
+    {certStatus.label}
+  </span>
+
+</div>
+
                 </div>
               );
             })}
