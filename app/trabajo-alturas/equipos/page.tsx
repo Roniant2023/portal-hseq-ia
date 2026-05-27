@@ -690,22 +690,24 @@ export default function HeightEquipmentPage() {
                     )}
                   </div>
 
-                  <div className="text-sm">
-                    <b>Caducidad:</b>{" "}
-                    
-                      className={
-                        certStatus.label.includes("VENCIDA")
-                          ? "text-red-600 font-bold"
-                          : certStatus.label.includes("VENCE")
-                          ? "text-amber-600 font-bold"
-                          : certStatus.label.includes("VIGENTE")
-                          ? "text-green-700 font-semibold"
-                          : "text-neutral-700"
-                      }
-                    >
-                      {item.certification_expiry_date || "—"}
-                    </span>
-                  </div>
+
+                 <div className="text-sm">
+  <b>Caducidad:</b>{" "}
+  <span
+    className={
+      certStatus.label.includes("VENCIDA")
+        ? "text-red-600 font-bold"
+        : certStatus.label.includes("VENCE")
+        ? "text-amber-600 font-bold"
+        : certStatus.label.includes("VIGENTE")
+        ? "text-green-700 font-semibold"
+        : "text-neutral-700"
+    }
+  >
+    {item.certification_expiry_date || "—"}
+  </span>
+</div>
+
 
                   <div className="flex flex-wrap gap-2">
 
