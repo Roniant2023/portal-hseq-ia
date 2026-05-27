@@ -157,20 +157,25 @@ export default function HeightEquipmentPage() {
   }
 
   async function uploadDocument(file: File, folder: string) {
-    const path = `${folder}/${Date.now()}-${file.name}`;
+  const cleanFileName = file.name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9.-]/g, "_");
 
-    const { error } = await supabase.storage
-      .from("height-equipment")
-      .upload(path, file, { upsert: true });
+  const path = `${folder}/${Date.now()}-${cleanFileName}`;
 
-    if (error) throw error;
+  const { error } = await supabase.storage
+    .from("height-equipment")
+    .upload(path, file, { upsert: true });
 
-    const { data } = supabase.storage
-      .from("height-equipment")
-      .getPublicUrl(path);
+  if (error) throw error;
 
-    return data.publicUrl;
-  }
+  const { data } = supabase.storage
+    .from("height-equipment")
+    .getPublicUrl(path);
+
+  return data.publicUrl;
+}
 
   async function loadEquipment() {
     const { data, error } = await supabase
