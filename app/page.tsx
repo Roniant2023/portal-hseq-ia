@@ -10,7 +10,7 @@ external: false,
   {
     title: "Trabajo en Alturas",
     icon: "/icons/trabajo-alturas.png",
-    href: "#",
+    href: "/trabajo-alturas/equipos",
     external: false,
   },
   {
