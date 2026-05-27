@@ -344,12 +344,11 @@ export default function HeightEquipmentPage() {
           <div className="border rounded p-4 space-y-3">
             <div className="font-semibold">Foto principal del elemento</div>
             <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => setMainPhoto(e.target.files?.[0] || null)}
-              className="border p-2 rounded w-full"
-            />
+  type="file"
+  accept="image/*"
+  onChange={(e) => setMainPhoto(e.target.files?.[0] || null)}
+  className="border p-2 rounded w-full"
+/>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
