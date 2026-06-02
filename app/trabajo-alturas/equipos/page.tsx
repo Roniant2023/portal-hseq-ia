@@ -502,12 +502,11 @@ export default function HeightEquipmentPage() {
 </Field>
 
 <Field label="Persona a cargo">
-  <input className="border p-2 rounded" value={form.person_in_charge} onChange={(e) => updateField("person_in_charge", e.target.value)} />
+  <input className="border p-2 rounded" value={form.person_in_charge} onChange={(e) => updateField("person_in_charge", e.target.value)
+} 
+/>
 </Field>     
 
-
-              }
-            />
           </div>
 
           <div className="border rounded p-4 space-y-3">
