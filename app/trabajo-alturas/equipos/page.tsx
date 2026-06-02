@@ -59,6 +59,26 @@ const emptyForm = {
   gallery_urls: [] as string[],
 };
 
+function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <label className="text-xs font-medium text-neutral-600">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+
 export default function HeightEquipmentPage() {
   const [form, setForm] = useState(emptyForm);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -417,112 +437,75 @@ export default function HeightEquipmentPage() {
               />
             </div>
 
-            <input
-              className="border p-2 rounded md:col-span-3"
-              placeholder="Nombre del elemento"
-              value={form.equipment_name}
-              onChange={(e) => updateField("equipment_name", e.target.value)}
-            />
+     <Field label="Nombre del elemento" className="md:col-span-3">
+  <input
+    className="border p-2 rounded"
+    value={form.equipment_name}
+    onChange={(e) => updateField("equipment_name", e.target.value)}
+  />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Categoría"
-              value={form.category}
-              onChange={(e) => updateField("category", e.target.value)}
-            />
+<Field label="Categoría">
+  <input className="border p-2 rounded" value={form.category} onChange={(e) => updateField("category", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Marca"
-              value={form.brand}
-              onChange={(e) => updateField("brand", e.target.value)}
-            />
+<Field label="Marca">
+  <input className="border p-2 rounded" value={form.brand} onChange={(e) => updateField("brand", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Modelo No."
-              value={form.model}
-              onChange={(e) => updateField("model", e.target.value)}
-            />
+<Field label="Modelo No.">
+  <input className="border p-2 rounded" value={form.model} onChange={(e) => updateField("model", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Código interno"
-              value={form.internal_code}
-              onChange={(e) => updateField("internal_code", e.target.value)}
-            />
+<Field label="Código interno">
+  <input className="border p-2 rounded" value={form.internal_code} onChange={(e) => updateField("internal_code", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Tiempo de vida útil"
-              value={form.useful_life}
-              onChange={(e) => updateField("useful_life", e.target.value)}
-            />
+<Field label="Tiempo de vida útil">
+  <input className="border p-2 rounded" value={form.useful_life} onChange={(e) => updateField("useful_life", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Fabricante / MFRD"
-              value={form.manufacturer}
-              onChange={(e) => updateField("manufacturer", e.target.value)}
-            />
+<Field label="Fabricante / MFRD">
+  <input className="border p-2 rounded" value={form.manufacturer} onChange={(e) => updateField("manufacturer", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Lote"
-              value={form.lot}
-              onChange={(e) => updateField("lot", e.target.value)}
-            />
+<Field label="Lote">
+  <input className="border p-2 rounded" value={form.lot} onChange={(e) => updateField("lot", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Capacidad"
-              value={form.capacity}
-              onChange={(e) => updateField("capacity", e.target.value)}
-            />
+<Field label="Capacidad">
+  <input className="border p-2 rounded" value={form.capacity} onChange={(e) => updateField("capacity", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Número de serie"
-              value={form.serial_number}
-              onChange={(e) => updateField("serial_number", e.target.value)}
-            />
+<Field label="Número de serie">
+  <input className="border p-2 rounded" value={form.serial_number} onChange={(e) => updateField("serial_number", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded md:col-span-3"
-              placeholder="Cumple estándar"
-              value={form.standard_compliance}
-              onChange={(e) =>
-                updateField("standard_compliance", e.target.value)
-              }
-            />
+<Field label="Cumple estándar" className="md:col-span-3">
+  <input className="border p-2 rounded" value={form.standard_compliance} onChange={(e) => updateField("standard_compliance", e.target.value)} />
+</Field>
 
-            <textarea
-              className="border p-2 rounded md:col-span-3 min-h-[100px]"
-              placeholder="Descripción del elemento"
-              value={form.description}
-              onChange={(e) => updateField("description", e.target.value)}
-            />
+<Field label="Descripción del elemento" className="md:col-span-3">
+  <textarea
+    className="border p-2 rounded min-h-[100px]"
+    value={form.description}
+    onChange={(e) => updateField("description", e.target.value)}
+  />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Elaborado por"
-              value={form.prepared_by}
-              onChange={(e) => updateField("prepared_by", e.target.value)}
-            />
+<Field label="Elaborado por">
+  <input className="border p-2 rounded" value={form.prepared_by} onChange={(e) => updateField("prepared_by", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Área de servicio"
-              value={form.service_area}
-              onChange={(e) => updateField("service_area", e.target.value)}
-            />
+<Field label="Área de servicio">
+  <input className="border p-2 rounded" value={form.service_area} onChange={(e) => updateField("service_area", e.target.value)} />
+</Field>
 
-            <input
-              className="border p-2 rounded"
-              placeholder="Persona a cargo"
-              value={form.person_in_charge}
-              onChange={(e) =>
-                updateField("person_in_charge", e.target.value)
+<Field label="Persona a cargo">
+  <input className="border p-2 rounded" value={form.person_in_charge} onChange={(e) => updateField("person_in_charge", e.target.value)} />
+</Field>     
+
+
               }
             />
           </div>
