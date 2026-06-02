@@ -90,6 +90,7 @@ export default function HeightEquipmentPage() {
   const [uiInfo, setUiInfo] = useState("");
   const [uiError, setUiError] = useState("");
 const [viewMode, setViewMode] = useState<"menu" | "new" | "list">("menu");
+const [editingId, setEditingId] = useState<string | null>(null);
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -207,6 +208,27 @@ const [viewMode, setViewMode] = useState<"menu" | "new" | "list">("menu");
     setEquipment((data || []) as Equipment[]);
   }
 
+function startEditEquipment(item: Equipment) {
+  setEditingId(item.id);
+
+  setForm({
+    ...emptyForm,
+    ...(item as any),
+    certification_validity_months: String(
+      item.certification_validity_months || 12
+    ),
+    location_other: "",
+    well_services_unit: (item as any).well_services_unit || "",
+  });
+
+  setMainPhoto(null);
+  setTechnicalSheetFile(null);
+  setManufacturerCertFile(null);
+  setUiInfo("Editando hoja de vida existente.");
+  setUiError("");
+  setViewMode("new");
+}
+
   async function saveEquipment() {
     try {
       setSaving(true);
@@ -261,15 +283,37 @@ const [viewMode, setViewMode] = useState<"menu" | "new" | "list">("menu");
   main_photo_url: photoUrl || form.main_photo_url,
 };
 
-      const { error } = await supabase.from("height_equipment").insert(payload);
+      let error = null;
 
-      if (error) {
-        setUiError(error.message);
-        return;
-      }
+if (editingId) {
+  const result = await supabase
+    .from("height_equipment")
+    .update(payload)
+    .eq("id", editingId);
 
-      setUiInfo("✅ Hoja de vida guardada correctamente.");
-      setForm(emptyForm);
+  error = result.error;
+} else {
+  const result = await supabase
+    .from("height_equipment")
+    .insert(payload);
+
+  error = result.error;
+}
+
+if (error) {
+  setUiError(error.message);
+  return;
+}
+
+setUiInfo(
+  editingId
+    ? "✅ Hoja de vida actualizada correctamente."
+    : "✅ Hoja de vida guardada correctamente."
+);
+
+setEditingId(null);
+setForm(emptyForm);      
+
       setMainPhoto(null);
       setTechnicalSheetFile(null);
       setManufacturerCertFile(null);
@@ -697,7 +741,14 @@ const [viewMode, setViewMode] = useState<"menu" | "new" | "list">("menu");
             disabled={saving}
             className="w-full bg-black text-white py-3 rounded font-semibold disabled:opacity-50"
           >
-            {saving ? "Guardando..." : "Guardar hoja de vida"}
+            
+{saving
+  ? "Guardando..."
+  : editingId
+  ? "Actualizar hoja de vida"
+  : "Guardar hoja de vida"}
+
+
           </button>
         </section>
 )}
@@ -757,6 +808,18 @@ const [viewMode, setViewMode] = useState<"menu" | "new" | "list">("menu");
                   <div className="text-sm">
                     <b>Ubicación:</b> {item.location || "—"}
                   </div>
+
+<div className="pt-2">
+  <button
+    type="button"
+    onClick={() => startEditEquipment(item)}
+    className="w-full border rounded p-2 text-sm font-medium hover:bg-neutral-50"
+  >
+    ✏️ Editar hoja de vida
+  </button>
+</div>
+
+
 
                   <div className="flex flex-wrap gap-2">
                     {item.technical_sheet_url && (
