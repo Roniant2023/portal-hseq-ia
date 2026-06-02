@@ -57,6 +57,7 @@ const emptyForm = {
   status: "IN_SERVICE",
   main_photo_url: "",
   gallery_urls: [] as string[],
+well_services_unit: "",
 };
 
 function Field({
@@ -239,20 +240,26 @@ export default function HeightEquipmentPage() {
       const { location_other, ...formToSave } = form;
 
       const payload = {
-        ...formToSave,
-        location:
-          form.location === "Otros"
-            ? form.location_other
-            : form.location,
-        technical_sheet: Boolean(technicalSheetUrl),
-        manufacturer_certification: Boolean(manufacturerCertificationUrl),
-        technical_sheet_url: technicalSheetUrl,
-        manufacturer_certification_url: manufacturerCertificationUrl,
-        certification_validity_months: Number(
-          form.certification_validity_months || 12
-        ),
-        main_photo_url: photoUrl || form.main_photo_url,
-      };
+  ...formToSave,
+  location:
+    form.location === "Otros"
+      ? form.location_other
+      : form.location,
+
+  well_services_unit:
+    form.location === "Well Services"
+      ? (form as any).well_services_unit || null
+      : null,
+
+  technical_sheet: Boolean(technicalSheetUrl),
+  manufacturer_certification: Boolean(manufacturerCertificationUrl),
+  technical_sheet_url: technicalSheetUrl,
+  manufacturer_certification_url: manufacturerCertificationUrl,
+  certification_validity_months: Number(
+    form.certification_validity_months || 12
+  ),
+  main_photo_url: photoUrl || form.main_photo_url,
+};
 
       const { error } = await supabase.from("height_equipment").insert(payload);
 
@@ -321,36 +328,84 @@ export default function HeightEquipmentPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-neutral-600">
-                Lugar / unidad operativa
-              </label>
+<div className="flex flex-col gap-1">
+  <label className="text-xs font-medium text-neutral-600">
+    Lugar / unidad operativa
+  </label>
 
-              <select
-                className="border p-2 rounded"
-                value={form.location}
-                onChange={(e) => updateField("location", e.target.value)}
-              >
-                <option value="">Lugar / unidad operativa</option>
-                <option value="Base Tocancipa">Base Tocancipa</option>
-<option value="Base Palermo">Base Palermo</option>
-<option value="Lote La Florida">Lote La Florida</option>
-<option value="Well Services">Well Services</option>
-<option value="Rig E2027">Rig E2027</option>
-<option value="Otros">Otros</option>
-              </select>
+  <select
+    className="border p-2 rounded"
+    value={form.location}
+    onChange={(e) => updateField("location", e.target.value)}
+  >
+    <option value="">Lugar / unidad operativa</option>
+    <option value="Base Tocancipa">Base Tocancipa</option>
+    <option value="Base Palermo">Base Palermo</option>
+    <option value="Lote La Florida">Lote La Florida</option>
+    <option value="Well Services">Well Services</option>
+    <option value="Rig E2027">Rig E2027</option>
+    <option value="Otros">Otros</option>
+  </select>
 
-              {form.location === "Otros" && (
-                <input
-                  className="border p-2 rounded"
-                  placeholder="Especifique ubicación"
-                  value={form.location_other}
-                  onChange={(e) =>
-                    updateField("location_other", e.target.value)
-                  }
-                />
-              )}
-            </div>
+  {form.location === "Well Services" && (
+    <select
+      className="border p-2 rounded mt-2"
+      value={(form as any).well_services_unit || ""}
+      onChange={(e) =>
+        updateField("well_services_unit", e.target.value)
+      }
+    >
+      <option value="">Seleccione unidad Well Services</option>
+
+      {[
+        "CA101",
+        "CR102",
+        "CR103",
+        "CR104",
+        "CR111",
+        "CR106",
+        "CR107",
+        "CMR108",
+        "CMR109",
+        "CMR110",
+        "MCR101",
+        "MCR102",
+        "MCR103",
+        "MCR104",
+        "BR101",
+        "BR102",
+        "BR103",
+        "TR101",
+        "TR102",
+        "TR103",
+        "FT46948",
+        "FT5700",
+        "FT46950",
+        "CTR101",
+        "CTR102",
+        "CABAJA47742",
+        "CAALTA46229",
+        "CAALTA21380",
+        "CAALTA31404",
+      ].map((unit) => (
+        <option key={unit} value={unit}>
+          {unit}
+        </option>
+      ))}
+    </select>
+  )}
+
+  {form.location === "Otros" && (
+    <input
+      className="border p-2 rounded mt-2"
+      placeholder="Especifique ubicación"
+      value={form.location_other}
+      onChange={(e) =>
+        updateField("location_other", e.target.value)
+      }
+    />
+  )}
+</div>            
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-neutral-600">
