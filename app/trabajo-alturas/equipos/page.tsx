@@ -263,10 +263,12 @@ function startEditEquipment(item: Equipment) {
 
       const payload = {
   ...formToSave,
-  location:
-    form.location === "Otros"
-      ? form.location_other
-      : form.location,
+ location:
+  form.location === "Well Services"
+    ? `Well Services - ${(form as any).well_services_unit || ""}`
+    : form.location === "Otros"
+    ? form.location_other
+    : form.location,
 
   well_services_unit:
     form.location === "Well Services"
