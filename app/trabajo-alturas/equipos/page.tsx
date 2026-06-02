@@ -333,12 +333,11 @@ export default function HeightEquipmentPage() {
               >
                 <option value="">Lugar / unidad operativa</option>
                 <option value="Base Tocancipa">Base Tocancipa</option>
-                <option value="Base Palermo">Base Palermo</option>
-                <option value="Lote La Florida">Lote La Florida</option>
-                <option value="Cementación">Cementación</option>
-                <option value="Coiled tubing">Coiled tubing</option>
-                <option value="Rig E2027">Rig E2027</option>
-                <option value="Otros">Otros</option>
+<option value="Base Palermo">Base Palermo</option>
+<option value="Lote La Florida">Lote La Florida</option>
+<option value="Well Services">Well Services</option>
+<option value="Rig E2027">Rig E2027</option>
+<option value="Otros">Otros</option>
               </select>
 
               {form.location === "Otros" && (
