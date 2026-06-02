@@ -89,7 +89,7 @@ export default function HeightEquipmentPage() {
   const [saving, setSaving] = useState(false);
   const [uiInfo, setUiInfo] = useState("");
   const [uiError, setUiError] = useState("");
-
+const [viewMode, setViewMode] = useState<"menu" | "new" | "list">("menu");
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -322,10 +322,55 @@ export default function HeightEquipmentPage() {
           </div>
         )}
 
-        <section className="border rounded-xl p-4 space-y-4 bg-white shadow-sm">
+{viewMode === "menu" && (
+  <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <button
+      type="button"
+      onClick={() => setViewMode("new")}
+      className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
+    >
+      <div className="text-2xl font-bold">
+        Incluir nuevo elemento
+      </div>
+
+      <div className="text-sm text-neutral-600 mt-2">
+        Registrar hoja de vida, foto, ficha técnica,
+        certificación y fechas de vencimiento.
+      </div>
+    </button>
+
+    <button
+      type="button"
+      onClick={() => setViewMode("list")}
+      className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
+    >
+      <div className="text-2xl font-bold">
+        Revisar hojas de vida
+      </div>
+
+      <div className="text-sm text-neutral-600 mt-2">
+        Consultar elementos registrados,
+        documentos, estados y vencimientos.
+      </div>
+    </button>
+  </section>
+)}
+
+        {viewMode === "new" && (
+<section className="border rounded-xl p-4 space-y-4 bg-white shadow-sm">
           <div className="bg-blue-900 text-white text-center font-bold py-2 rounded">
             HOJA DE VIDA ELEMENTOS DE PROTECCIÓN CONTRA CAÍDAS
           </div>
+
+<div className="flex justify-end">
+  <button
+    type="button"
+    onClick={() => setViewMode("menu")}
+    className="border rounded px-4 py-2 text-sm bg-white"
+  >
+    ← Volver al menú
+  </button>
+</div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 <div className="flex flex-col gap-1">
@@ -655,9 +700,20 @@ export default function HeightEquipmentPage() {
             {saving ? "Guardando..." : "Guardar hoja de vida"}
           </button>
         </section>
+)}
+        {viewMode === "list" && (
+<section className="space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+  <h2 className="text-xl font-bold">Hojas de vida registradas</h2>
 
-        <section className="space-y-3">
-          <h2 className="text-xl font-bold">Equipos registrados</h2>
+  <button
+    type="button"
+    onClick={() => setViewMode("menu")}
+    className="border rounded px-4 py-2 text-sm"
+  >
+    ← Volver al menú
+  </button>
+</div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {equipment.map((item) => {
@@ -776,6 +832,7 @@ export default function HeightEquipmentPage() {
             })}
           </div>
         </section>
+)}
       </div>
     </main>
   );
