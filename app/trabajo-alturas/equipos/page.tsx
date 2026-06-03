@@ -744,44 +744,26 @@ export default function HeightEquipmentPage() {
               </Field>
             </div>
 
-            <div className="border rounded p-4 space-y-3">
+<div className="border rounded p-4 space-y-3">
   <div className="font-semibold">Foto principal del elemento</div>
 
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-    <div className="space-y-2">
-      <div className="text-sm font-medium text-neutral-700">
-        Tomar foto con cámara
-      </div>
+  <p className="text-xs text-neutral-500">
+    Seleccione una imagen desde la galería o tome una fotografía.
+  </p>
 
-      <input
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={(e) => setMainPhoto(e.target.files?.[0] || null)}
-        className="border p-2 rounded w-full"
-      />
-    </div>
-
-    <div className="space-y-2">
-      <div className="text-sm font-medium text-neutral-700">
-        Cargar imagen desde memoria
-      </div>
-
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => setMainPhoto(e.target.files?.[0] || null)}
-        className="border p-2 rounded w-full"
-      />
-    </div>
-  </div>
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) => setMainPhoto(e.target.files?.[0] || null)}
+    className="border p-2 rounded w-full"
+  />
 
   {mainPhoto && (
     <div className="text-sm text-green-700">
       ✅ Imagen seleccionada: {mainPhoto.name}
     </div>
   )}
-</div>
+</div>            
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="border rounded p-4 space-y-2">
