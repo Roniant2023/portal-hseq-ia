@@ -27,6 +27,7 @@ type Equipment = {
   certification_expiry_date: string;
   technical_sheet_url: string;
   manufacturer_certification_url: string;
+serial_number?: string;
   well_services_unit?: string;
 };
 
@@ -130,6 +131,10 @@ export default function HeightEquipmentPage() {
   const [pendingEditItem, setPendingEditItem] = useState<Equipment | null>(
     null
   );
+const [searchTerm, setSearchTerm] = useState("");
+const [locationFilter, setLocationFilter] = useState("");
+const [operationalStatusFilter, setOperationalStatusFilter] = useState("");
+const [certificationFilter, setCertificationFilter] = useState("");
 
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -393,6 +398,58 @@ export default function HeightEquipmentPage() {
   useEffect(() => {
     loadEquipment();
   }, []);
+
+function getCertificationFilterValue(expiryDate: string) {
+  const cert = getCertificationStatus(expiryDate);
+
+  if (cert.label.includes("VENCIDA")) return "VENCIDA";
+  if (cert.label.includes("VENCE")) return "POR_VENCER";
+  if (cert.label.includes("VIGENTE")) return "VIGENTE";
+  return "SIN_FECHA";
+}
+
+const filteredEquipment = equipment.filter((item) => {
+  const term = searchTerm.trim().toLowerCase();
+
+  const searchableText = [
+    item.equipment_code,
+    item.internal_code,
+    item.equipment_name,
+    item.serial_number,
+    item.location,
+    item.brand,
+    item.category,
+    item.well_services_unit,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const matchesSearch = !term || searchableText.includes(term);
+
+  const matchesLocation =
+    !locationFilter ||
+    String(item.location || "")
+      .toLowerCase()
+      .includes(locationFilter.toLowerCase());
+
+  const matchesOperational =
+    !operationalStatusFilter || item.status === operationalStatusFilter;
+
+  const matchesCertification =
+    !certificationFilter ||
+    getCertificationFilterValue(item.certification_expiry_date) ===
+      certificationFilter;
+
+  return (
+    matchesSearch &&
+    matchesLocation &&
+    matchesOperational &&
+    matchesCertification
+  );
+});
+
+
 
   return (
     <main className="min-h-screen bg-white text-neutral-900">
@@ -897,8 +954,76 @@ export default function HeightEquipmentPage() {
               </button>
             </div>
 
+<div className="border rounded-xl p-4 bg-white space-y-3">
+  <div className="font-semibold">Consulta de elementos</div>
+
+  <input
+    className="border p-2 rounded w-full"
+    placeholder="Buscar por código, serial, nombre, ubicación, marca o unidad..."
+    value={searchTerm}
+    onChange={(e) => setSearchTerm(e.target.value)}
+  />
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <select
+      className="border p-2 rounded"
+      value={locationFilter}
+      onChange={(e) => setLocationFilter(e.target.value)}
+    >
+      <option value="">Todas las ubicaciones</option>
+      <option value="Base Tocancipa">Base Tocancipa</option>
+      <option value="Base Palermo">Base Palermo</option>
+      <option value="Lote La Florida">Lote La Florida</option>
+      <option value="Well Services">Well Services</option>
+      <option value="Rig E2027">Rig E2027</option>
+    </select>
+
+    <select
+      className="border p-2 rounded"
+      value={operationalStatusFilter}
+      onChange={(e) => setOperationalStatusFilter(e.target.value)}
+    >
+      <option value="">Todos los estados</option>
+      <option value="IN_SERVICE">En servicio</option>
+      <option value="OUT_OF_SERVICE">Fuera de servicio</option>
+    </select>
+
+    <select
+      className="border p-2 rounded"
+      value={certificationFilter}
+      onChange={(e) => setCertificationFilter(e.target.value)}
+    >
+      <option value="">Todas las certificaciones</option>
+      <option value="VIGENTE">Certificación vigente</option>
+      <option value="POR_VENCER">Próxima a vencer</option>
+      <option value="VENCIDA">Vencida</option>
+      <option value="SIN_FECHA">Sin fecha</option>
+    </select>
+  </div>
+
+  <div className="flex items-center justify-between gap-3 flex-wrap text-sm text-neutral-600">
+    <div>
+      Resultados: <b>{filteredEquipment.length}</b> de{" "}
+      <b>{equipment.length}</b>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => {
+        setSearchTerm("");
+        setLocationFilter("");
+        setOperationalStatusFilter("");
+        setCertificationFilter("");
+      }}
+      className="border rounded px-3 py-1"
+    >
+      Limpiar filtros
+    </button>
+  </div>
+</div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {equipment.map((item) => {
+              {filteredEquipment.map((item) => {
                 const certStatus = getCertificationStatus(
                   item.certification_expiry_date
                 );
