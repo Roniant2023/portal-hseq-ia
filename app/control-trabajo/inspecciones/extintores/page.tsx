@@ -563,12 +563,36 @@ function addFiveYearsToMonthEnd(monthValue: string) {
     Foto del extintor
   </div>
 
-  <input
-    type="file"
-    accept="image/*"
-    onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
-    className="border p-2 rounded w-full"
-  />
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+    <div className="space-y-2">
+      <div className="text-sm font-medium text-neutral-700">
+        Tomar foto con cámara
+      </div>
+
+      <input
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+        className="border p-2 rounded w-full"
+      />
+    </div>
+
+    <div className="space-y-2">
+      <div className="text-sm font-medium text-neutral-700">
+        Cargar imagen desde galería
+      </div>
+
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+        className="border p-2 rounded w-full"
+      />
+    </div>
+
+  </div>
 
   {photoFile && (
     <div className="text-sm text-green-700">
