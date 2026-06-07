@@ -22,6 +22,28 @@ const ORDER_CLEANLINESS_ITEMS = [
   "¿Hay documentos no necesarios para las actividades cotidianas?",
 ];
 
+const ENVIRONMENTAL_KIT_ITEMS = [
+  "Linterna",
+  "Máscara media cara",
+  "Filtro MP/VO",
+  "Filtro VO",
+  "Monogafas",
+  "Cordones absorbentes",
+  "Almohadillas absorbentes",
+  "Guantes de nitrilo",
+  "Pala antichispa",
+  "Recipiente para residuos contaminados",
+  "Bolsa para residuos contaminados",
+  "Cinta de peligro",
+  "Traje Tyvek",
+  "Botas de caucho",
+  "Overol impermeable",
+  "Escoba",
+  "Recogedor",
+  "Caneca de contingencia",
+  "Kit de derrames completo",
+];
+
 export default function AmbientalPage() {
 const [viewMode, setViewMode] = useState<ViewMode>("menu");
 
@@ -33,13 +55,22 @@ const [form, setForm] = useState({
   operator: "",
   well: "",
   location: "",
-specific_site: "",
+  specific_site: "",
   location_other: "",
- order_cleanliness: ORDER_CLEANLINESS_ITEMS.map((question) => ({
-  question,
-  answer: "CUMPLE",
-  observation: "",
-})),
+
+  order_cleanliness: ORDER_CLEANLINESS_ITEMS.map((question) => ({
+    question,
+    answer: "CUMPLE",
+    observation: "",
+  })),
+
+  environmental_kit: ENVIRONMENTAL_KIT_ITEMS.map((item) => ({
+    item,
+    available: "SI",
+    quantity: "",
+    status: "B",
+    observation: "",
+  })),
 });
 
 function updateField(key: string, value: any) {
@@ -256,15 +287,10 @@ function updateField(key: string, value: any) {
 </div>            
 
 <div className="border rounded-xl p-4 space-y-4">
-  <div className="font-bold text-lg">
-    1. Orden y aseo
-  </div>
+  <div className="font-bold text-lg">1. Orden y aseo</div>
 
   {form.order_cleanliness.map((item, index) => (
-    <div
-      key={index}
-      className="border rounded p-3 space-y-2 bg-neutral-50"
-    >
+    <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
       <div className="text-sm font-medium">
         {index + 1}. {item.question}
       </div>
@@ -297,6 +323,66 @@ function updateField(key: string, value: any) {
   ))}
 </div>
 
+<div className="border rounded-xl p-4 space-y-4">
+  <div className="font-bold text-lg">2. Kit Ambiental</div>
+
+  {form.environmental_kit.map((item, index) => (
+    <div key={index} className="border rounded p-3 space-y-3 bg-neutral-50">
+      <div className="font-medium">{item.item}</div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <select
+          className="border p-2 rounded"
+          value={item.available}
+          onChange={(e) => {
+            const updated = [...form.environmental_kit];
+            updated[index].available = e.target.value;
+            updateField("environmental_kit", updated);
+          }}
+        >
+          <option value="SI">Disponible</option>
+          <option value="NO">No disponible</option>
+        </select>
+
+        <input
+          className="border p-2 rounded"
+          placeholder="Cantidad"
+          value={item.quantity}
+          onChange={(e) => {
+            const updated = [...form.environmental_kit];
+            updated[index].quantity = e.target.value;
+            updateField("environmental_kit", updated);
+          }}
+        />
+
+        <select
+          className="border p-2 rounded"
+          value={item.status}
+          onChange={(e) => {
+            const updated = [...form.environmental_kit];
+            updated[index].status = e.target.value;
+            updateField("environmental_kit", updated);
+          }}
+        >
+          <option value="B">Bueno</option>
+          <option value="M">Malo</option>
+          <option value="RC">Reemplazar</option>
+        </select>
+
+        <input
+          className="border p-2 rounded"
+          placeholder="Observación"
+          value={item.observation}
+          onChange={(e) => {
+            const updated = [...form.environmental_kit];
+            updated[index].observation = e.target.value;
+            updateField("environmental_kit", updated);
+          }}
+        />
+      </div>
+    </div>
+  ))}
+</div>
 
           </section>
         )}
