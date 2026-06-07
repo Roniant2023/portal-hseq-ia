@@ -2,29 +2,6 @@
 
 import { useState } from "react";
 
-const WELL_SERVICES_UNITS = [
-  "CA101",
-  "CR102",
-  "CR103",
-  "CR104",
-  "CR111",
-  "CR106",
-  "CR107",
-  "CMR108",
-  "CMR109",
-  "CMR110",
-  "MCR101",
-  "MCR102",
-  "MCR103",
-  "MCR104",
-  "BR101",
-  "BR102",
-  "BR103",
-  "TR101",
-  "TR102",
-  "TR103",
-];
-
 type ViewMode = "menu" | "new" | "list";
 
 export default function AmbientalPage() {
@@ -38,8 +15,9 @@ const [form, setForm] = useState({
   operator: "",
   well: "",
   location: "",
+specific_site: "",
   location_other: "",
-  well_services_unit: "",
+ 
 });
 
 function updateField(key: string, value: any) {
@@ -232,23 +210,14 @@ function updateField(key: string, value: any) {
       <option value="Otros">Otros</option>
     </select>
 
-    {form.location === "Well Services" && (
-      <select
-        className="border p-2 rounded w-full mt-2"
-        value={form.well_services_unit}
-        onChange={(e) =>
-          updateField("well_services_unit", e.target.value)
-        }
-      >
-        <option value="">Seleccione unidad</option>
-
-        {WELL_SERVICES_UNITS.map((unit) => (
-          <option key={unit} value={unit}>
-            {unit}
-          </option>
-        ))}
-      </select>
-    )}
+   <input
+  className="border p-2 rounded w-full mt-2"
+  placeholder="Sitio específico"
+  value={form.specific_site}
+  onChange={(e) =>
+    updateField("specific_site", e.target.value)
+  }
+/>
 
     {form.location === "Otros" && (
       <input
