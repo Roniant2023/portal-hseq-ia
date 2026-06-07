@@ -104,6 +104,24 @@ const WATER_TREATMENT_ITEMS = [
   "Condiciones de seguridad para el acceso",
 ];
 
+const HYDRAULIC_NETWORK_ITEMS = [
+  "Estado general de la red hidráulica",
+  "Ausencia de fugas visibles",
+  "Estado de válvulas y conexiones",
+  "Estado de mangueras y tuberías",
+  "Identificación de líneas o puntos de agua",
+  "Presión adecuada del sistema",
+  "Estado de tanques de almacenamiento",
+  "Limpieza de puntos de suministro",
+  "Ausencia de conexiones improvisadas",
+  "Drenajes libres de obstrucciones",
+  "Canales o cunetas en buen estado",
+  "Ausencia de encharcamientos",
+  "Mantenimiento preventivo registrado",
+  "Condiciones seguras para intervención",
+  "Uso eficiente del recurso hídrico",
+];
+
 export default function AmbientalPage() {
 const [viewMode, setViewMode] = useState<ViewMode>("menu");
 
@@ -154,6 +172,12 @@ bathrooms: BATHROOM_ITEMS.map((bathroom) => ({
 })),
 
 water_treatment: WATER_TREATMENT_ITEMS.map((item) => ({
+  item,
+  answer: "CUMPLE",
+  observation: "",
+})),
+
+hydraulic_network: HYDRAULIC_NETWORK_ITEMS.map((item) => ({
   item,
   answer: "CUMPLE",
   observation: "",
@@ -636,6 +660,45 @@ function updateField(key: string, value: any) {
           const updated = [...form.water_treatment];
           updated[index].observation = e.target.value;
           updateField("water_treatment", updated);
+        }}
+      />
+    </div>
+  ))}
+</div>
+
+<div className="border rounded-xl p-4 space-y-4">
+  <div className="font-bold text-lg">
+    7. Red hidráulica
+  </div>
+
+  {form.hydraulic_network.map((item, index) => (
+    <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
+      <div className="font-medium">
+        {index + 1}. {item.item}
+      </div>
+
+      <select
+        className="border p-2 rounded w-full"
+        value={item.answer}
+        onChange={(e) => {
+          const updated = [...form.hydraulic_network];
+          updated[index].answer = e.target.value;
+          updateField("hydraulic_network", updated);
+        }}
+      >
+        <option value="CUMPLE">Cumple</option>
+        <option value="NO CUMPLE">No cumple</option>
+        <option value="NA">N/A</option>
+      </select>
+
+      <textarea
+        className="border p-2 rounded w-full min-h-[70px]"
+        placeholder="Observaciones"
+        value={item.observation}
+        onChange={(e) => {
+          const updated = [...form.hydraulic_network];
+          updated[index].observation = e.target.value;
+          updateField("hydraulic_network", updated);
         }}
       />
     </div>
