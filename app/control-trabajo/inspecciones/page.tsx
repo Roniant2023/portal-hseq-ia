@@ -20,6 +20,7 @@ export default function InspeccionesPage() {
         </div>
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
           <a
             href="/control-trabajo/inspecciones/extintores"
             className="border rounded-2xl p-6 bg-white shadow-sm hover:shadow-md transition"
@@ -34,6 +35,22 @@ export default function InspeccionesPage() {
               Registro, consulta e inspección de extintores.
             </div>
           </a>
+
+          <a
+            href="/control-trabajo/inspecciones/ambiental"
+            className="border rounded-2xl p-6 bg-white shadow-sm hover:shadow-md transition"
+          >
+            <div className="text-4xl mb-3">🌱</div>
+
+            <div className="text-xl font-bold">
+              Ambiental
+            </div>
+
+            <div className="text-sm text-neutral-600 mt-2">
+              Inspección ambiental, orden y aseo, kit ambiental y evidencias.
+            </div>
+          </a>
+
         </section>
       </div>
     </main>
