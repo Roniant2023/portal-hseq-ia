@@ -4,6 +4,24 @@ import { useState } from "react";
 
 type ViewMode = "menu" | "new" | "list";
 
+const ORDER_CLEANLINESS_ITEMS = [
+  "¿Los pisos, vías peatonales, pasillos, entradas y salidas se encuentran libres de obstáculos y basura?",
+  "¿El cableado de equipos se encuentra debidamente canalizado y no genera riesgo de caídas o de incendio?",
+  "¿El área de trabajo se encuentra libre de basura, polvo, aceite, agua, combustibles o materiales combustibles?",
+  "¿Los extintores se encuentran en su lugar correspondiente y de fácil acceso?",
+  "¿Las zonas del área de trabajo se encuentran adecuadamente demarcadas?",
+  "¿Los elementos, equipos o paneles eléctricos están debidamente etiquetados?",
+  "¿Las paredes, barandillas y puertas del área de trabajo están limpias?",
+  "¿Los pisos están libres de suciedad, escombros, aceite, partes o accesorios?",
+  "¿Los equipos y herramientas tienen un uso definido en las actividades rutinarias?",
+  "¿Los equipos y herramientas tienen un lugar definido para ser guardados?",
+  "¿Hay equipos o herramientas no necesarios en el sitio de trabajo?",
+  "¿Todos los equipos tienen uso definido para las actividades propias del área?",
+  "¿Hay equipos obsoletos, dañados o rotos?",
+  "¿Los equipos tienen ubicación adecuada según necesidad, ergonomía y espacio?",
+  "¿Hay documentos no necesarios para las actividades cotidianas?",
+];
+
 export default function AmbientalPage() {
 const [viewMode, setViewMode] = useState<ViewMode>("menu");
 
@@ -17,7 +35,11 @@ const [form, setForm] = useState({
   location: "",
 specific_site: "",
   location_other: "",
- 
+ order_cleanliness: ORDER_CLEANLINESS_ITEMS.map((question) => ({
+  question,
+  answer: "CUMPLE",
+  observation: "",
+})),
 });
 
 function updateField(key: string, value: any) {
@@ -232,6 +254,49 @@ function updateField(key: string, value: any) {
   </div>
 
 </div>            
+
+<div className="border rounded-xl p-4 space-y-4">
+  <div className="font-bold text-lg">
+    1. Orden y aseo
+  </div>
+
+  {form.order_cleanliness.map((item, index) => (
+    <div
+      key={index}
+      className="border rounded p-3 space-y-2 bg-neutral-50"
+    >
+      <div className="text-sm font-medium">
+        {index + 1}. {item.question}
+      </div>
+
+      <select
+        className="border p-2 rounded w-full"
+        value={item.answer}
+        onChange={(e) => {
+          const updated = [...form.order_cleanliness];
+          updated[index].answer = e.target.value;
+          updateField("order_cleanliness", updated);
+        }}
+      >
+        <option value="CUMPLE">Cumple</option>
+        <option value="NO CUMPLE">No cumple</option>
+        <option value="NA">N/A</option>
+      </select>
+
+      <textarea
+        className="border p-2 rounded w-full min-h-[70px]"
+        placeholder="Observaciones"
+        value={item.observation}
+        onChange={(e) => {
+          const updated = [...form.order_cleanliness];
+          updated[index].observation = e.target.value;
+          updateField("order_cleanliness", updated);
+        }}
+      />
+    </div>
+  ))}
+</div>
+
 
           </section>
         )}
