@@ -235,6 +235,30 @@ async function saveInspection() {
   }
 }
 
+function getLastDayOfMonth(monthValue: string) {
+  if (!monthValue) return "";
+
+  const [year, month] = monthValue.split("-").map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+
+function getMonthValueFromDate(dateValue: string) {
+  if (!dateValue) return "";
+  return dateValue.slice(0, 7);
+}
+
+function addFiveYearsToMonthEnd(monthValue: string) {
+  if (!monthValue) return "";
+
+  const [year, month] = monthValue.split("-").map(Number);
+  const targetYear = year + 5;
+  const lastDay = new Date(targetYear, month, 0).getDate();
+
+  return `${targetYear}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+
   useEffect(() => {
     loadRecords();
   }, []);
@@ -435,35 +459,57 @@ async function saveInspection() {
       </Field>
 
       <Field label="Vencimiento carga">
-        <input
-          type="date"
-          className="border p-2 rounded"
-          value={form.charge_expiry_date}
-          onChange={(e) => updateField("charge_expiry_date", e.target.value)}
-        />
-      </Field>
+  <input
+    type="month"
+    className="border p-2 rounded"
+    value={getMonthValueFromDate(form.charge_expiry_date)}
+    onChange={(e) =>
+      updateField("charge_expiry_date", getLastDayOfMonth(e.target.value))
+    }
+  />
+
+  {form.charge_expiry_date && (
+    <div className="text-xs text-neutral-500">
+      Se guardará como: {form.charge_expiry_date}
+    </div>
+  )}
+</Field>
 
       <Field label="Fecha P.H.">
-        <input
-          type="date"
-          className="border p-2 rounded"
-          value={form.hydrostatic_test_date}
-          onChange={(e) =>
-            updateField("hydrostatic_test_date", e.target.value)
-          }
-        />
-      </Field>
+  <input
+    type="month"
+    className="border p-2 rounded"
+    value={getMonthValueFromDate(form.hydrostatic_test_date)}
+    onChange={(e) => {
+      const monthValue = e.target.value;
 
-      <Field label="Vencimiento P.H.">
-        <input
-          type="date"
-          className="border p-2 rounded"
-          value={form.hydrostatic_expiry_date}
-          onChange={(e) =>
-            updateField("hydrostatic_expiry_date", e.target.value)
-          }
-        />
-      </Field>
+      updateField("hydrostatic_test_date", getLastDayOfMonth(monthValue));
+      updateField("hydrostatic_expiry_date", addFiveYearsToMonthEnd(monthValue));
+    }}
+  />
+
+  {form.hydrostatic_test_date && (
+    <div className="text-xs text-neutral-500">
+      Se guardará como: {form.hydrostatic_test_date}
+    </div>
+  )}
+</Field>
+
+<Field label="Vencimiento P.H.">
+  <input
+    type="date"
+    className="border p-2 rounded bg-neutral-50"
+    value={form.hydrostatic_expiry_date}
+    readOnly
+  />
+
+  {form.hydrostatic_expiry_date && (
+    <div className="text-xs text-neutral-500">
+      Calculado automáticamente: {form.hydrostatic_expiry_date}
+    </div>
+  )}
+</Field>    
+
     </div>
 
 <div className="border rounded p-4 space-y-3">
