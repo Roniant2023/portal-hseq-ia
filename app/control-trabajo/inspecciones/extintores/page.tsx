@@ -127,7 +127,9 @@ export default function ExtintoresPage() {
   const [saving, setSaving] = useState(false);
   const [uiInfo, setUiInfo] = useState("");
   const [uiError, setUiError] = useState("");
-
+const [searchTerm, setSearchTerm] = useState("");
+const [locationFilter, setLocationFilter] = useState("");
+const [resultFilter, setResultFilter] = useState("");
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -262,6 +264,40 @@ function addFiveYearsToMonthEnd(monthValue: string) {
   useEffect(() => {
     loadRecords();
   }, []);
+
+
+const filteredRecords = records.filter((item) => {
+  const term = searchTerm.trim().toLowerCase();
+
+  const searchableText = [
+    item.extinguisher_code,
+    item.location,
+    item.well_services_unit,
+    item.brand,
+    item.class,
+    item.type,
+    item.capacity,
+    item.located_at,
+    item.result,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const matchesSearch = !term || searchableText.includes(term);
+
+  const matchesLocation =
+    !locationFilter ||
+    String(item.location || "")
+      .toLowerCase()
+      .includes(locationFilter.toLowerCase());
+
+  const matchesResult =
+    !resultFilter || item.result === resultFilter;
+
+  return matchesSearch && matchesLocation && matchesResult;
+});
+
 
   return (
     <main className="min-h-screen bg-white text-neutral-900">
@@ -612,6 +648,148 @@ function addFiveYearsToMonthEnd(monthValue: string) {
 
   </section>
 )}
+
+{viewMode === "list" && (
+  <section className="space-y-4">
+    <div className="flex items-center justify-between gap-3 flex-wrap">
+      <h2 className="text-xl font-bold">
+        Consulta de extintores
+      </h2>
+
+      <button
+        type="button"
+        onClick={() => setViewMode("menu")}
+        className="border rounded px-4 py-2 text-sm"
+      >
+        ← Volver al menú
+      </button>
+    </div>
+
+    <div className="border rounded-xl p-4 bg-white space-y-3">
+      <div className="font-semibold">Filtros de consulta</div>
+
+      <input
+        className="border p-2 rounded w-full"
+        placeholder="Buscar por código, ubicación, marca, clase, tipo o capacidad..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <select
+          className="border p-2 rounded"
+          value={locationFilter}
+          onChange={(e) => setLocationFilter(e.target.value)}
+        >
+          <option value="">Todas las ubicaciones</option>
+          <option value="Base Tocancipa">Base Tocancipa</option>
+          <option value="Base Palermo">Base Palermo</option>
+          <option value="Lote La Florida">Lote La Florida</option>
+          <option value="Well Services">Well Services</option>
+          <option value="Rig E2027">Rig E2027</option>
+        </select>
+
+        <select
+          className="border p-2 rounded"
+          value={resultFilter}
+          onChange={(e) => setResultFilter(e.target.value)}
+        >
+          <option value="">Todos los resultados</option>
+          <option value="CUMPLE">Cumple</option>
+          <option value="NO CUMPLE">No cumple</option>
+        </select>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 flex-wrap text-sm text-neutral-600">
+        <div>
+          Resultados: <b>{filteredRecords.length}</b> de{" "}
+          <b>{records.length}</b>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSearchTerm("");
+            setLocationFilter("");
+            setResultFilter("");
+          }}
+          className="border rounded px-3 py-1"
+        >
+          Limpiar filtros
+        </button>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {filteredRecords.map((item) => (
+        <div
+          key={item.id}
+          className="border rounded-xl p-4 bg-white shadow-sm space-y-3"
+        >
+          {item.photo_url ? (
+            <img
+              src={item.photo_url}
+              alt={item.extinguisher_code}
+              className="h-40 w-full object-contain border rounded bg-neutral-50"
+            />
+          ) : (
+            <div className="h-40 border rounded bg-neutral-50 flex items-center justify-center text-sm text-neutral-500">
+              Sin foto
+            </div>
+          )}
+
+          <div>
+            <div className="font-bold">
+              {item.extinguisher_code || "Sin código"}
+            </div>
+
+            <div className="text-sm text-neutral-600">
+              {item.class || "Sin clase"} · {item.type || "Sin tipo"} ·{" "}
+              {item.capacity || "Sin capacidad"}
+            </div>
+          </div>
+
+          <div className="text-sm">
+            <b>Ubicación:</b> {item.location || "—"}
+          </div>
+
+          <div className="text-sm">
+            <b>Ubicado en:</b> {item.located_at || "—"}
+          </div>
+
+          <div className="text-sm">
+            <b>Inspección:</b> {item.inspection_date || "—"}
+          </div>
+
+          <div className="text-sm">
+            <b>Venc. carga:</b> {item.charge_expiry_date || "—"}
+          </div>
+
+          <div className="text-sm">
+            <b>Venc. P.H.:</b> {item.hydrostatic_expiry_date || "—"}
+          </div>
+
+          <span
+            className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
+              item.result === "NO CUMPLE"
+                ? "bg-red-700 text-white"
+                : "bg-green-700 text-white"
+            }`}
+          >
+            {item.result || "SIN RESULTADO"}
+          </span>
+
+          {item.observations && (
+            <div className="text-sm text-neutral-700">
+              <b>Obs:</b> {item.observations}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </section>
+)}
+
       </div>
     </main>
   );
