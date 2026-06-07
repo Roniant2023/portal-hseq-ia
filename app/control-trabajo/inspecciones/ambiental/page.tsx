@@ -44,6 +44,19 @@ const ENVIRONMENTAL_KIT_ITEMS = [
   "Kit de derrames completo",
 ];
 
+const ECOLOGICAL_POINT_ITEMS = [
+  "Caneca blanca (aprovechables)",
+  "Caneca verde (orgánicos)",
+  "Caneca negra (no aprovechables)",
+  "Caneca roja (biosanitarios o peligrosos)",
+  "Rotulación visible",
+  "Código de colores conforme a la normatividad",
+  "Estado físico adecuado de las canecas",
+  "Tapas en buen estado",
+  "Segregación correcta de residuos",
+  "Área limpia y ordenada",
+];
+
 export default function AmbientalPage() {
 const [viewMode, setViewMode] = useState<ViewMode>("menu");
 
@@ -71,6 +84,13 @@ const [form, setForm] = useState({
     status: "B",
     observation: "",
   })),
+
+ecological_point: ECOLOGICAL_POINT_ITEMS.map((item) => ({
+  item,
+  answer: "CUMPLE",
+  observation: "",
+})),
+
 });
 
 function updateField(key: string, value: any) {
@@ -384,6 +404,44 @@ function updateField(key: string, value: any) {
   ))}
 </div>
 
+<div className="border rounded-xl p-4 space-y-4">
+  <div className="font-bold text-lg">
+    3. Punto Ecológico
+  </div>
+
+  {form.ecological_point.map((item, index) => (
+    <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
+      <div className="font-medium">
+        {item.item}
+      </div>
+
+      <select
+        className="border p-2 rounded w-full"
+        value={item.answer}
+        onChange={(e) => {
+          const updated = [...form.ecological_point];
+          updated[index].answer = e.target.value;
+          updateField("ecological_point", updated);
+        }}
+      >
+        <option value="CUMPLE">Cumple</option>
+        <option value="NO CUMPLE">No cumple</option>
+        <option value="NA">N/A</option>
+      </select>
+
+      <textarea
+        className="border p-2 rounded w-full min-h-[70px]"
+        placeholder="Observaciones"
+        value={item.observation}
+        onChange={(e) => {
+          const updated = [...form.ecological_point];
+          updated[index].observation = e.target.value;
+          updateField("ecological_point", updated);
+        }}
+      />
+    </div>
+  ))}
+</div>
           </section>
         )}
 
