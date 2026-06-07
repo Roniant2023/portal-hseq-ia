@@ -125,6 +125,23 @@ const HYDRAULIC_NETWORK_ITEMS = [
 export default function AmbientalPage() {
 const [viewMode, setViewMode] = useState<ViewMode>("menu");
 
+const [openSections, setOpenSections] = useState({
+  orderCleanliness: true,
+  environmentalKit: false,
+  ecologicalPoint: false,
+  chemicalStorage: false,
+  bathrooms: false,
+  waterTreatment: false,
+  hydraulicNetwork: false,
+});
+
+function toggleSection(section: keyof typeof openSections) {
+  setOpenSections((prev) => ({
+    ...prev,
+    [section]: !prev[section],
+  }));
+}
+
 const [form, setForm] = useState({
   inspection_date: "",
   inspector_name: "",
@@ -399,9 +416,19 @@ function updateField(key: string, value: any) {
 </div>            
 
 <div className="border rounded-xl p-4 space-y-4">
-  <div className="font-bold text-lg">1. Orden y aseo</div>
+  <button
+    type="button"
+    onClick={() => toggleSection("orderCleanliness")}
+    className="w-full flex items-center justify-between text-left"
+  >
+    <div className="font-bold text-lg">1. Orden y aseo</div>
+    <div className="text-sm text-neutral-500">
+      {openSections.orderCleanliness ? "Ocultar ▲" : "Mostrar ▼"}
+    </div>
+  </button>
 
-  {form.order_cleanliness.map((item, index) => (
+  {openSections.orderCleanliness &&
+    form.order_cleanliness.map((item, index) => (
     <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
       <div className="text-sm font-medium">
         {index + 1}. {item.question}
@@ -436,9 +463,24 @@ function updateField(key: string, value: any) {
 </div>
 
 <div className="border rounded-xl p-4 space-y-4">
-  <div className="font-bold text-lg">2. Kit Ambiental</div>
+  <button
+    type="button"
+    onClick={() => toggleSection("environmentalKit")}
+    className="w-full flex items-center justify-between text-left"
+  >
+    <div className="font-bold text-lg">
+      2. Kit Ambiental
+    </div>
 
-  {form.environmental_kit.map((item, index) => (
+    <div className="text-sm text-neutral-500">
+      {openSections.environmentalKit
+        ? "Ocultar ▲"
+        : "Mostrar ▼"}
+    </div>
+  </button>
+
+  {openSections.environmentalKit &&
+    form.environmental_kit.map((item, index) => (
     <div key={index} className="border rounded p-3 space-y-3 bg-neutral-50">
       <div className="font-medium">{item.item}</div>
 
@@ -497,11 +539,24 @@ function updateField(key: string, value: any) {
 </div>
 
 <div className="border rounded-xl p-4 space-y-4">
-  <div className="font-bold text-lg">
-    3. Punto Ecológico
-  </div>
+  <button
+    type="button"
+    onClick={() => toggleSection("ecologicalPoint")}
+    className="w-full flex items-center justify-between text-left"
+  >
+    <div className="font-bold text-lg">
+      3. Punto Ecológico
+    </div>
 
-  {form.ecological_point.map((item, index) => (
+    <div className="text-sm text-neutral-500">
+      {openSections.ecologicalPoint
+        ? "Ocultar ▲"
+        : "Mostrar ▼"}
+    </div>
+  </button>
+
+  {openSections.ecologicalPoint &&
+    form.ecological_point.map((item, index) => (
     <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
       <div className="font-medium">
         {item.item}
@@ -536,11 +591,22 @@ function updateField(key: string, value: any) {
 </div>
 
 <div className="border rounded-xl p-4 space-y-4">
-  <div className="font-bold text-lg">
-    4. Almacenamiento de Sustancias Químicas
-  </div>
+  <button
+    type="button"
+    onClick={() => toggleSection("chemicalStorage")}
+    className="w-full flex items-center justify-between text-left"
+  >
+    <div className="font-bold text-lg">
+      4. Almacenamiento de Sustancias Químicas
+    </div>
 
-  {form.chemical_storage.map((item, index) => (
+    <div className="text-sm text-neutral-500">
+      {openSections.chemicalStorage ? "Ocultar ▲" : "Mostrar ▼"}
+    </div>
+  </button>
+
+  {openSections.chemicalStorage &&
+    form.chemical_storage.map((item, index) => (
     <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
       <div className="font-medium">
         {index + 1}. {item.item}
@@ -574,11 +640,22 @@ function updateField(key: string, value: any) {
   ))}
 </div>
 <div className="border rounded-xl p-4 space-y-4">
-  <div className="font-bold text-lg">
-    5. Baños
-  </div>
+  <button
+    type="button"
+    onClick={() => toggleSection("bathrooms")}
+    className="w-full flex items-center justify-between text-left"
+  >
+    <div className="font-bold text-lg">
+      5. Baños
+    </div>
 
-  {form.bathrooms.map((bathroom, bathroomIndex) => (
+    <div className="text-sm text-neutral-500">
+      {openSections.bathrooms ? "Ocultar ▲" : "Mostrar ▼"}
+    </div>
+  </button>
+
+  {openSections.bathrooms &&
+    form.bathrooms.map((bathroom, bathroomIndex) => (
     <div
       key={bathroomIndex}
       className="border rounded p-3 space-y-3 bg-neutral-50"
@@ -628,11 +705,24 @@ function updateField(key: string, value: any) {
 </div>
 
 <div className="border rounded-xl p-4 space-y-4">
-  <div className="font-bold text-lg">
-    6. Planta de tratamiento de agua
-  </div>
+  <button
+    type="button"
+    onClick={() => toggleSection("waterTreatment")}
+    className="w-full flex items-center justify-between text-left"
+  >
+    <div className="font-bold text-lg">
+      6. Planta de tratamiento de agua
+    </div>
 
-  {form.water_treatment.map((item, index) => (
+    <div className="text-sm text-neutral-500">
+      {openSections.waterTreatment
+        ? "Ocultar ▲"
+        : "Mostrar ▼"}
+    </div>
+  </button>
+
+  {openSections.waterTreatment &&
+    form.water_treatment.map((item, index) => (
     <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
       <div className="font-medium">
         {index + 1}. {item.item}
@@ -667,11 +757,22 @@ function updateField(key: string, value: any) {
 </div>
 
 <div className="border rounded-xl p-4 space-y-4">
-  <div className="font-bold text-lg">
-    7. Red hidráulica
-  </div>
+  <button
+    type="button"
+    onClick={() => toggleSection("hydraulicNetwork")}
+    className="w-full flex items-center justify-between text-left"
+  >
+    <div className="font-bold text-lg">
+      7. Red hidráulica
+    </div>
 
-  {form.hydraulic_network.map((item, index) => (
+    <div className="text-sm text-neutral-500">
+      {openSections.hydraulicNetwork ? "Ocultar ▲" : "Mostrar ▼"}
+    </div>
+  </button>
+
+  {openSections.hydraulicNetwork &&
+    form.hydraulic_network.map((item, index) => (
     <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
       <div className="font-medium">
         {index + 1}. {item.item}
