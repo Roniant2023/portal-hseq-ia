@@ -1,0 +1,548 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+);
+
+type ViewMode = "menu" | "new" | "list";
+
+type ExtinguisherInspection = {
+  id: string;
+  created_at: string;
+  inspection_date: string;
+  inspector_name: string;
+  location: string;
+  location_other: string;
+  well_services_unit: string;
+  extinguisher_code: string;
+  brand: string;
+  class: string;
+  type: string;
+  capacity: string;
+  charge_expiry_date: string;
+  hydrostatic_test_date: string;
+  hydrostatic_expiry_date: string;
+  cylinder_status: string;
+  gauge_status: string;
+  pressure_status: string;
+  hose_status: string;
+  nozzle_status: string;
+  trigger_status: string;
+  seal_status: string;
+  located_at: string;
+  observations: string;
+  result: string;
+  action_required: string;
+  photo_url: string;
+};
+
+const emptyForm = {
+  inspection_date: "",
+  inspector_name: "",
+  location: "",
+  location_other: "",
+  well_services_unit: "",
+  extinguisher_code: "",
+  brand: "",
+  class: "",
+  type: "",
+  capacity: "",
+  charge_expiry_date: "",
+  hydrostatic_test_date: "",
+  hydrostatic_expiry_date: "",
+  cylinder_status: "B",
+  gauge_status: "B",
+  pressure_status: "B",
+  hose_status: "B",
+  nozzle_status: "B",
+  trigger_status: "B",
+  seal_status: "B",
+  located_at: "",
+  observations: "",
+  result: "",
+  action_required: "",
+  photo_url: "",
+};
+
+const WELL_SERVICES_UNITS = [
+  "CA101",
+  "CR102",
+  "CR103",
+  "CR104",
+  "CR111",
+  "CR106",
+  "CR107",
+  "CMR108",
+  "CMR109",
+  "CMR110",
+  "MCR101",
+  "MCR102",
+  "MCR103",
+  "MCR104",
+  "BR101",
+  "BR102",
+  "BR103",
+  "TR101",
+  "TR102",
+  "TR103",
+  "FT46948",
+  "FT5700",
+  "FT46950",
+  "CTR101",
+  "CTR102",
+  "CABAJA47742",
+  "CAALTA46229",
+  "CAALTA21380",
+  "CAALTA31404",
+];
+
+function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <label className="text-xs font-medium text-neutral-600">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+export default function ExtintoresPage() {
+  const [viewMode, setViewMode] = useState<ViewMode>("menu");
+  const [form, setForm] = useState(emptyForm);
+  const [records, setRecords] = useState<ExtinguisherInspection[]>([]);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uiInfo, setUiInfo] = useState("");
+  const [uiError, setUiError] = useState("");
+
+  function updateField(key: string, value: any) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function loadRecords() {
+    const { data, error } = await supabase
+      .from("fire_extinguisher_inspections")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setUiError(error.message);
+      return;
+    }
+
+    setRecords((data || []) as ExtinguisherInspection[]);
+  }
+
+async function uploadPhoto() {
+  if (!photoFile) return "";
+
+  const cleanFileName = photoFile.name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9.-]/g, "_");
+
+  const path = `extintores/${Date.now()}-${cleanFileName}`;
+
+  const { error } = await supabase.storage
+    .from("hseq-inspections")
+    .upload(path, photoFile, { upsert: true });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage
+    .from("hseq-inspections")
+    .getPublicUrl(path);
+
+  return data.publicUrl;
+}
+
+function calculateResult() {
+  const statuses = [
+    form.cylinder_status,
+    form.gauge_status,
+    form.pressure_status,
+    form.hose_status,
+    form.nozzle_status,
+    form.trigger_status,
+    form.seal_status,
+  ];
+
+  return statuses.includes("M") ? "NO CUMPLE" : "CUMPLE";
+}
+
+async function saveInspection() {
+  try {
+    setSaving(true);
+    setUiError("");
+    setUiInfo("");
+
+    if (!form.inspection_date) {
+      setUiError("Debes diligenciar la fecha de inspección.");
+      return;
+    }
+
+    if (!form.extinguisher_code.trim()) {
+      setUiError("Debes diligenciar el código del extintor.");
+      return;
+    }
+
+    const photoUrl = await uploadPhoto();
+    const result = calculateResult();
+
+    const payload = {
+      ...form,
+      location:
+        form.location === "Well Services"
+          ? `Well Services - ${form.well_services_unit || ""}`
+          : form.location === "Otros"
+          ? form.location_other
+          : form.location,
+      result,
+      photo_url: photoUrl || form.photo_url,
+    };
+
+    const { error } = await supabase
+      .from("fire_extinguisher_inspections")
+      .insert(payload);
+
+    if (error) {
+      setUiError(error.message);
+      return;
+    }
+
+    setUiInfo("✅ Inspección de extintor guardada correctamente.");
+    setForm(emptyForm);
+    setPhotoFile(null);
+    await loadRecords();
+    setViewMode("list");
+  } catch (err: any) {
+    setUiError(err?.message || "Error guardando inspección.");
+  } finally {
+    setSaving(false);
+  }
+}
+
+  useEffect(() => {
+    loadRecords();
+  }, []);
+
+  return (
+    <main className="min-h-screen bg-white text-neutral-900">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div>
+          <a
+            href="/control-trabajo/inspecciones"
+            className="text-sm text-neutral-600 hover:text-black"
+          >
+            ← Volver a Inspecciones
+          </a>
+
+          <h1 className="text-3xl font-bold mt-2">
+            Inspección de Extintores
+          </h1>
+
+          <p className="text-sm text-neutral-600">
+            Registro, consulta y seguimiento de extintores.
+          </p>
+        </div>
+
+        {(uiError || uiInfo) && (
+          <div
+            className={`border rounded p-3 text-sm ${
+              uiError
+                ? "bg-red-50 border-red-200 text-red-800"
+                : "bg-green-50 border-green-200 text-green-800"
+            }`}
+          >
+            {uiError || uiInfo}
+          </div>
+        )}
+
+        {viewMode === "menu" && (
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setViewMode("new")}
+              className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
+            >
+              <div className="text-2xl font-bold">
+                Registrar inspección
+              </div>
+
+              <div className="text-sm text-neutral-600 mt-2">
+                Registrar inspección individual de extintor.
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
+            >
+              <div className="text-2xl font-bold">
+                Consultar extintores
+              </div>
+
+              <div className="text-sm text-neutral-600 mt-2">
+                Buscar por código, ubicación, tipo o resultado.
+              </div>
+            </button>
+          </section>
+        )}
+{viewMode === "new" && (
+  <section className="border rounded-xl p-4 space-y-4 bg-white shadow-sm">
+    <div className="bg-red-700 text-white text-center font-bold py-2 rounded">
+      INSPECCIÓN DE EXTINTORES
+    </div>
+
+    <div className="flex justify-end">
+      <button
+        type="button"
+        onClick={() => setViewMode("menu")}
+        className="border rounded px-4 py-2 text-sm bg-white"
+      >
+        ← Volver al menú
+      </button>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <Field label="Fecha de inspección">
+        <input
+          type="date"
+          className="border p-2 rounded"
+          value={form.inspection_date}
+          onChange={(e) => updateField("inspection_date", e.target.value)}
+        />
+      </Field>
+
+      <Field label="Inspeccionado por">
+        <input
+          className="border p-2 rounded"
+          value={form.inspector_name}
+          onChange={(e) => updateField("inspector_name", e.target.value)}
+        />
+      </Field>
+
+      <Field label="Código / No.">
+        <input
+          className="border p-2 rounded"
+          value={form.extinguisher_code}
+          onChange={(e) => updateField("extinguisher_code", e.target.value)}
+        />
+      </Field>
+
+      <Field label="Unidad Operativa / Departamento">
+        <select
+          className="border p-2 rounded"
+          value={form.location}
+          onChange={(e) => updateField("location", e.target.value)}
+        >
+          <option value="">Seleccione ubicación</option>
+          <option value="Base Tocancipa">Base Tocancipa</option>
+          <option value="Base Palermo">Base Palermo</option>
+          <option value="Lote La Florida">Lote La Florida</option>
+          <option value="Well Services">Well Services</option>
+          <option value="Rig E2027">Rig E2027</option>
+          <option value="Otros">Otros</option>
+        </select>
+
+        {form.location === "Well Services" && (
+          <select
+            className="border p-2 rounded mt-2"
+            value={form.well_services_unit}
+            onChange={(e) =>
+              updateField("well_services_unit", e.target.value)
+            }
+          >
+            <option value="">Seleccione unidad Well Services</option>
+            {WELL_SERVICES_UNITS.map((unit) => (
+              <option key={unit} value={unit}>
+                {unit}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {form.location === "Otros" && (
+          <input
+            className="border p-2 rounded mt-2"
+            placeholder="Especifique ubicación"
+            value={form.location_other}
+            onChange={(e) => updateField("location_other", e.target.value)}
+          />
+        )}
+      </Field>
+
+      <Field label="Ubicado en">
+        <input
+          className="border p-2 rounded"
+          value={form.located_at}
+          onChange={(e) => updateField("located_at", e.target.value)}
+        />
+      </Field>
+
+      <Field label="Marca fábrica">
+        <input
+          className="border p-2 rounded"
+          value={form.brand}
+          onChange={(e) => updateField("brand", e.target.value)}
+        />
+      </Field>
+
+      <Field label="Clase">
+        <select
+          className="border p-2 rounded"
+          value={form.class}
+          onChange={(e) => updateField("class", e.target.value)}
+        >
+          <option value="">Seleccione</option>
+          <option value="ABC">ABC</option>
+          <option value="BC">BC</option>
+        </select>
+      </Field>
+
+      <Field label="Tipo">
+        <select
+          className="border p-2 rounded"
+          value={form.type}
+          onChange={(e) => updateField("type", e.target.value)}
+        >
+          <option value="">Seleccione</option>
+          <option value="PQ">PQ</option>
+          <option value="CO2">CO2</option>
+        </select>
+      </Field>
+
+      <Field label="Capacidad">
+        <input
+          className="border p-2 rounded"
+          value={form.capacity}
+          onChange={(e) => updateField("capacity", e.target.value)}
+        />
+      </Field>
+
+      <Field label="Vencimiento carga">
+        <input
+          type="date"
+          className="border p-2 rounded"
+          value={form.charge_expiry_date}
+          onChange={(e) => updateField("charge_expiry_date", e.target.value)}
+        />
+      </Field>
+
+      <Field label="Fecha P.H.">
+        <input
+          type="date"
+          className="border p-2 rounded"
+          value={form.hydrostatic_test_date}
+          onChange={(e) =>
+            updateField("hydrostatic_test_date", e.target.value)
+          }
+        />
+      </Field>
+
+      <Field label="Vencimiento P.H.">
+        <input
+          type="date"
+          className="border p-2 rounded"
+          value={form.hydrostatic_expiry_date}
+          onChange={(e) =>
+            updateField("hydrostatic_expiry_date", e.target.value)
+          }
+        />
+      </Field>
+    </div>
+
+<div className="border rounded p-4 space-y-3">
+  <div className="font-semibold">
+    Estado del extintor
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    {[
+      ["cylinder_status", "Cilindro"],
+      ["gauge_status", "Manómetro"],
+      ["pressure_status", "Presión"],
+      ["hose_status", "Manguera"],
+      ["nozzle_status", "Boquilla"],
+      ["trigger_status", "Gatillo"],
+      ["seal_status", "Precinto"],
+    ].map(([key, label]) => (
+      <Field key={key} label={label}>
+        <select
+          className="border p-2 rounded"
+          value={(form as any)[key]}
+          onChange={(e) => updateField(key, e.target.value)}
+        >
+          <option value="B">B - Bien</option>
+          <option value="M">M - Mal</option>
+          <option value="NA">N/A</option>
+        </select>
+      </Field>
+    ))}
+  </div>
+</div>
+
+<Field label="Observaciones">
+  <textarea
+    className="border p-2 rounded min-h-[100px]"
+    value={form.observations}
+    onChange={(e) => updateField("observations", e.target.value)}
+  />
+</Field>
+
+<Field label="Acción requerida">
+  <textarea
+    className="border p-2 rounded min-h-[80px]"
+    value={form.action_required}
+    onChange={(e) => updateField("action_required", e.target.value)}
+  />
+</Field>
+
+<div className="border rounded p-4 space-y-3">
+  <div className="font-semibold">
+    Foto del extintor
+  </div>
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+    className="border p-2 rounded w-full"
+  />
+
+  {photoFile && (
+    <div className="text-sm text-green-700">
+      ✅ Imagen seleccionada: {photoFile.name}
+    </div>
+  )}
+</div>
+
+<button
+  type="button"
+  onClick={saveInspection}
+  disabled={saving}
+  className="w-full bg-black text-white py-3 rounded font-semibold disabled:opacity-50"
+>
+  {saving ? "Guardando..." : "Guardar inspección"}
+</button>
+
+  </section>
+)}
+      </div>
+    </main>
+  );
+}
