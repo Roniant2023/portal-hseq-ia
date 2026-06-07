@@ -76,6 +76,21 @@ const CHEMICAL_STORAGE_ITEMS = [
   "¿El almacenamiento cumple con condiciones de compatibilidad y seguridad?",
 ];
 
+const BATHROOM_ITEMS = [
+  "BAÑOS DE HOMBRES",
+  "OFICINAS ADMINISTRATIVAS",
+];
+
+const BATHROOM_CHECK_ITEMS = [
+  "Rejilla de ventilación",
+  "Dispensador papel sanitario",
+  "Palanca de succión",
+  "Bizcocho sanitario",
+  "Papelera",
+  "Piso y tapete",
+  "Manguera y tanque de almacenamiento",
+];
+
 export default function AmbientalPage() {
 const [viewMode, setViewMode] = useState<ViewMode>("menu");
 
@@ -114,6 +129,16 @@ chemical_storage: CHEMICAL_STORAGE_ITEMS.map((item) => ({
   item,
   answer: "CUMPLE",
   observation: "",
+})),
+
+bathrooms: BATHROOM_ITEMS.map((bathroom) => ({
+  bathroom,
+  items: BATHROOM_CHECK_ITEMS.map((item) => ({
+    item,
+    status: "BE",
+    observation: "",
+  })),
+
 })),
 
 });
@@ -506,6 +531,60 @@ function updateField(key: string, value: any) {
     </div>
   ))}
 </div>
+<div className="border rounded-xl p-4 space-y-4">
+  <div className="font-bold text-lg">
+    5. Baños
+  </div>
+
+  {form.bathrooms.map((bathroom, bathroomIndex) => (
+    <div
+      key={bathroomIndex}
+      className="border rounded p-3 space-y-3 bg-neutral-50"
+    >
+      <div className="font-semibold">
+        {bathroom.bathroom}
+      </div>
+
+      {bathroom.items.map((item, itemIndex) => (
+        <div
+          key={itemIndex}
+          className="grid grid-cols-1 md:grid-cols-3 gap-3 border-t pt-3"
+        >
+          <div className="text-sm font-medium">
+            {item.item}
+          </div>
+
+          <select
+            className="border p-2 rounded"
+            value={item.status}
+            onChange={(e) => {
+              const updated = [...form.bathrooms];
+              updated[bathroomIndex].items[itemIndex].status = e.target.value;
+              updateField("bathrooms", updated);
+            }}
+          >
+            <option value="BE">Buen estado</option>
+            <option value="ME">Mal estado</option>
+            <option value="NA">N/A</option>
+          </select>
+
+          <input
+            className="border p-2 rounded"
+            placeholder="Observación"
+            value={item.observation}
+            onChange={(e) => {
+              const updated = [...form.bathrooms];
+              updated[bathroomIndex].items[itemIndex].observation =
+                e.target.value;
+              updateField("bathrooms", updated);
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  ))}
+</div>
+
           </section>
         )}
 
