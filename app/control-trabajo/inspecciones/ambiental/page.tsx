@@ -57,6 +57,25 @@ const ECOLOGICAL_POINT_ITEMS = [
   "Área limpia y ordenada",
 ];
 
+const CHEMICAL_STORAGE_ITEMS = [
+  "¿Las sustancias químicas se encuentran debidamente rotuladas?",
+  "¿Los recipientes se encuentran en buen estado y sin fugas?",
+  "¿Se cuenta con hoja de seguridad disponible?",
+  "¿Las sustancias incompatibles se encuentran separadas?",
+  "¿El área cuenta con ventilación adecuada?",
+  "¿El área se encuentra limpia y ordenada?",
+  "¿Los productos están almacenados sobre estibas o bandejas de contención?",
+  "¿Se cuenta con kit de derrames disponible y completo?",
+  "¿El área cuenta con señalización de riesgo químico?",
+  "¿Los envases permanecen cerrados cuando no están en uso?",
+  "¿Se evita el almacenamiento directo sobre el piso?",
+  "¿El personal conoce los riesgos de las sustancias almacenadas?",
+  "¿Se cuenta con elementos de protección personal adecuados?",
+  "¿Los residuos químicos están identificados y segregados?",
+  "¿No se evidencian derrames o manchas en el área?",
+  "¿El almacenamiento cumple con condiciones de compatibilidad y seguridad?",
+];
+
 export default function AmbientalPage() {
 const [viewMode, setViewMode] = useState<ViewMode>("menu");
 
@@ -86,6 +105,12 @@ const [form, setForm] = useState({
   })),
 
 ecological_point: ECOLOGICAL_POINT_ITEMS.map((item) => ({
+  item,
+  answer: "CUMPLE",
+  observation: "",
+})),
+
+chemical_storage: CHEMICAL_STORAGE_ITEMS.map((item) => ({
   item,
   answer: "CUMPLE",
   observation: "",
@@ -437,6 +462,45 @@ function updateField(key: string, value: any) {
           const updated = [...form.ecological_point];
           updated[index].observation = e.target.value;
           updateField("ecological_point", updated);
+        }}
+      />
+    </div>
+  ))}
+</div>
+
+<div className="border rounded-xl p-4 space-y-4">
+  <div className="font-bold text-lg">
+    4. Almacenamiento de Sustancias Químicas
+  </div>
+
+  {form.chemical_storage.map((item, index) => (
+    <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
+      <div className="font-medium">
+        {index + 1}. {item.item}
+      </div>
+
+      <select
+        className="border p-2 rounded w-full"
+        value={item.answer}
+        onChange={(e) => {
+          const updated = [...form.chemical_storage];
+          updated[index].answer = e.target.value;
+          updateField("chemical_storage", updated);
+        }}
+      >
+        <option value="CUMPLE">Cumple</option>
+        <option value="NO CUMPLE">No cumple</option>
+        <option value="NA">N/A</option>
+      </select>
+
+      <textarea
+        className="border p-2 rounded w-full min-h-[70px]"
+        placeholder="Observaciones"
+        value={item.observation}
+        onChange={(e) => {
+          const updated = [...form.chemical_storage];
+          updated[index].observation = e.target.value;
+          updateField("chemical_storage", updated);
         }}
       />
     </div>
