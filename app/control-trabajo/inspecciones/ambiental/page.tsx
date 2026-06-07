@@ -91,6 +91,19 @@ const BATHROOM_CHECK_ITEMS = [
   "Manguera y tanque de almacenamiento",
 ];
 
+const WATER_TREATMENT_ITEMS = [
+  "Estado general de la planta de tratamiento",
+  "Ausencia de fugas o reboses",
+  "Estado de tuberías y conexiones",
+  "Estado de bombas y equipos asociados",
+  "Limpieza del área",
+  "Señalización del área",
+  "Ausencia de olores ofensivos",
+  "Manejo adecuado de lodos o residuos",
+  "Registro de operación y mantenimiento",
+  "Condiciones de seguridad para el acceso",
+];
+
 export default function AmbientalPage() {
 const [viewMode, setViewMode] = useState<ViewMode>("menu");
 
@@ -138,7 +151,12 @@ bathrooms: BATHROOM_ITEMS.map((bathroom) => ({
     status: "BE",
     observation: "",
   })),
+})),
 
+water_treatment: WATER_TREATMENT_ITEMS.map((item) => ({
+  item,
+  answer: "CUMPLE",
+  observation: "",
 })),
 
 });
@@ -585,6 +603,44 @@ function updateField(key: string, value: any) {
   ))}
 </div>
 
+<div className="border rounded-xl p-4 space-y-4">
+  <div className="font-bold text-lg">
+    6. Planta de tratamiento de agua
+  </div>
+
+  {form.water_treatment.map((item, index) => (
+    <div key={index} className="border rounded p-3 space-y-2 bg-neutral-50">
+      <div className="font-medium">
+        {index + 1}. {item.item}
+      </div>
+
+      <select
+        className="border p-2 rounded w-full"
+        value={item.answer}
+        onChange={(e) => {
+          const updated = [...form.water_treatment];
+          updated[index].answer = e.target.value;
+          updateField("water_treatment", updated);
+        }}
+      >
+        <option value="CUMPLE">Cumple</option>
+        <option value="NO CUMPLE">No cumple</option>
+        <option value="NA">N/A</option>
+      </select>
+
+      <textarea
+        className="border p-2 rounded w-full min-h-[70px]"
+        placeholder="Observaciones"
+        value={item.observation}
+        onChange={(e) => {
+          const updated = [...form.water_treatment];
+          updated[index].observation = e.target.value;
+          updateField("water_treatment", updated);
+        }}
+      />
+    </div>
+  ))}
+</div>
           </section>
         )}
 
