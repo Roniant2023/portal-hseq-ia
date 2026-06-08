@@ -409,24 +409,6 @@ const filteredExtinguishers = extinguishers.filter((item) => {
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
-function loadMonthlyItemsByLocation(location: string) {
-  const items = extinguishers
-    .filter((item) => item.location === location)
-    .map((item) => ({
-      ...item,
-      cylinder_status: "B",
-      gauge_status: "B",
-      pressure_status: "B",
-      hose_status: "B",
-      nozzle_status: "B",
-      trigger_status: "B",
-      seal_status: "B",
-      observations: "",
-      result: "CUMPLE",
-    }));
-
-  setMonthlyItems(items);
-}
 
   return !term || searchableText.includes(term);
 });
@@ -448,6 +430,77 @@ function loadMonthlyItemsByLocation(location: string) {
     }));
 
   setMonthlyItems(items);
+}
+
+async function saveMonthlyInspection() {
+  try {
+    setSaving(true);
+    setUiError("");
+    setUiInfo("");
+
+    if (!monthlyDate) {
+      setUiError("Debes seleccionar la fecha de inspección.");
+      return;
+    }
+
+    if (!monthlyInspector.trim()) {
+      setUiError("Debes diligenciar el inspector.");
+      return;
+    }
+
+    if (monthlyItems.length === 0) {
+      setUiError("No hay extintores cargados para inspeccionar.");
+      return;
+    }
+
+    const payload = monthlyItems.map((item) => {
+      const statuses = [
+        item.cylinder_status,
+        item.gauge_status,
+        item.pressure_status,
+        item.hose_status,
+        item.nozzle_status,
+        item.trigger_status,
+        item.seal_status,
+      ];
+
+      return {
+        inspection_date: monthlyDate,
+        inspector_name: monthlyInspector,
+        location: item.location,
+        extinguisher_code: item.extinguisher_code,
+        cylinder_status: item.cylinder_status,
+        gauge_status: item.gauge_status,
+        pressure_status: item.pressure_status,
+        hose_status: item.hose_status,
+        nozzle_status: item.nozzle_status,
+        trigger_status: item.trigger_status,
+        seal_status: item.seal_status,
+        observations: item.observations || "",
+        result: statuses.includes("M") ? "NO CUMPLE" : "CUMPLE",
+      };
+    });
+
+    const { error } = await supabase
+      .from("fire_extinguisher_monthly_inspections")
+      .insert(payload);
+
+    if (error) {
+      setUiError(error.message);
+      return;
+    }
+
+    setUiInfo("✅ Inspección mensual guardada correctamente.");
+    setMonthlyItems([]);
+    setMonthlyLocation("");
+    setMonthlyDate("");
+    setMonthlyInspector("");
+    setViewMode("list");
+  } catch (err: any) {
+    setUiError(err?.message || "Error guardando inspección mensual.");
+  } finally {
+    setSaving(false);
+  }
 }
   return (
     <main className="min-h-screen bg-white text-neutral-900">
@@ -941,6 +994,16 @@ function loadMonthlyItemsByLocation(location: string) {
     />
   </div>
 ))}
+
+<button
+  type="button"
+  onClick={saveMonthlyInspection}
+  disabled={saving || monthlyItems.length === 0}
+  className="w-full bg-red-700 text-white py-3 rounded font-semibold disabled:opacity-50"
+>
+  {saving ? "Guardando..." : "Guardar inspección mensual"}
+</button>
+
   </section>
 )}
 
