@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-type ViewMode = "menu" | "new" | "list";
+type ViewMode = "menu" | "newExtinguisher" | "monthlyInspection" | "list";
 
 type ExtinguisherInspection = {
   id: string;
@@ -185,6 +185,59 @@ function calculateResult() {
   return statuses.includes("M") ? "NO CUMPLE" : "CUMPLE";
 }
 
+async function saveExtinguisher() {
+  try {
+    setSaving(true);
+    setUiError("");
+    setUiInfo("");
+
+    if (!form.extinguisher_code.trim()) {
+      setUiError("Debes diligenciar el código del extintor.");
+      return;
+    }
+
+    const photoUrl = await uploadPhoto();
+
+    const payload = {
+      extinguisher_code: form.extinguisher_code,
+      location:
+        form.location === "Well Services"
+          ? `Well Services - ${form.well_services_unit || ""}`
+          : form.location === "Otros"
+          ? form.location_other
+          : form.location,
+      specific_site: form.located_at,
+      brand: form.brand,
+      class: form.class,
+      type: form.type,
+      capacity: form.capacity,
+      charge_expiry_date: form.charge_expiry_date,
+      hydrostatic_test_date: form.hydrostatic_test_date,
+      hydrostatic_expiry_date: form.hydrostatic_expiry_date,
+      status: "ACTIVE",
+      photo_url: photoUrl || form.photo_url,
+    };
+
+    const { error } = await supabase
+      .from("fire_extinguishers")
+      .insert(payload);
+
+    if (error) {
+      setUiError(error.message);
+      return;
+    }
+
+    setUiInfo("✅ Extintor registrado correctamente.");
+    setForm(emptyForm);
+    setPhotoFile(null);
+    setViewMode("list");
+  } catch (err: any) {
+    setUiError(err?.message || "Error registrando extintor.");
+  } finally {
+    setSaving(false);
+  }
+}
+
 async function saveInspection() {
   try {
     setSaving(true);
@@ -331,38 +384,53 @@ const filteredRecords = records.filter((item) => {
           </div>
         )}
 
-        {viewMode === "menu" && (
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={() => setViewMode("new")}
-              className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
-            >
-              <div className="text-2xl font-bold">
-                Registrar inspección
-              </div>
+{viewMode === "menu" && (
+  <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <button
+      type="button"
+      onClick={() => setViewMode("newExtinguisher")}
+      className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
+    >
+      <div className="text-2xl font-bold">
+        Registrar extintor
+      </div>
 
-              <div className="text-sm text-neutral-600 mt-2">
-                Registrar inspección individual de extintor.
-              </div>
-            </button>
+      <div className="text-sm text-neutral-600 mt-2">
+        Crear el activo maestro del extintor.
+      </div>
+    </button>
 
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
-            >
-              <div className="text-2xl font-bold">
-                Consultar extintores
-              </div>
+    <button
+      type="button"
+      onClick={() => setViewMode("monthlyInspection")}
+      className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
+    >
+      <div className="text-2xl font-bold">
+        Inspección mensual
+      </div>
 
-              <div className="text-sm text-neutral-600 mt-2">
-                Buscar por código, ubicación, tipo o resultado.
-              </div>
-            </button>
-          </section>
-        )}
-{viewMode === "new" && (
+      <div className="text-sm text-neutral-600 mt-2">
+        Inspeccionar un extintor ya registrado.
+      </div>
+    </button>
+
+    <button
+      type="button"
+      onClick={() => setViewMode("list")}
+      className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
+    >
+      <div className="text-2xl font-bold">
+        Consultar extintores
+      </div>
+
+      <div className="text-sm text-neutral-600 mt-2">
+        Buscar por código, ubicación, tipo o resultado.
+      </div>
+    </button>
+  </section>
+)}       
+
+{viewMode === "newExtinguisher" && (
   <section className="border rounded-xl p-4 space-y-4 bg-white shadow-sm">
     <div className="bg-red-700 text-white text-center font-bold py-2 rounded">
       INSPECCIÓN DE EXTINTORES
@@ -639,11 +707,11 @@ const filteredRecords = records.filter((item) => {
 
 <button
   type="button"
-  onClick={saveInspection}
+  onClick={saveExtinguisher}
   disabled={saving}
   className="w-full bg-black text-white py-3 rounded font-semibold disabled:opacity-50"
 >
-  {saving ? "Guardando..." : "Guardar inspección"}
+  {saving ? "Guardando..." : "Guardar extintor"}
 </button>
 
   </section>
