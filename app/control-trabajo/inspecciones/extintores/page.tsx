@@ -549,21 +549,31 @@ async function saveMonthlyInspection() {
         item.seal_status,
       ];
 
-      return {
-        inspection_date: monthlyDate,
-        inspector_name: monthlyInspector,
-        location: item.location,
-        extinguisher_code: item.extinguisher_code,
-        cylinder_status: item.cylinder_status,
-        gauge_status: item.gauge_status,
-        pressure_status: item.pressure_status,
-        hose_status: item.hose_status,
-        nozzle_status: item.nozzle_status,
-        trigger_status: item.trigger_status,
-        seal_status: item.seal_status,
-        observations: item.observations || "",
-        result: statuses.includes("M") ? "NO CUMPLE" : "CUMPLE",
-      };
+ return {
+  inspection_date: monthlyDate,
+  inspector_name: monthlyInspector,
+
+  location: item.found_location || item.location,
+  extinguisher_code: item.extinguisher_code,
+
+  registered_location: item.registered_location || item.location,
+  registered_well_services_unit:
+    item.registered_well_services_unit || "",
+
+  found_location: item.found_location || item.location,
+  found_well_services_unit:
+    item.found_well_services_unit || "",
+
+  cylinder_status: item.cylinder_status,
+  gauge_status: item.gauge_status,
+  pressure_status: item.pressure_status,
+  hose_status: item.hose_status,
+  nozzle_status: item.nozzle_status,
+  trigger_status: item.trigger_status,
+  seal_status: item.seal_status,
+  observations: item.observations || "",
+  result: statuses.includes("M") ? "NO CUMPLE" : "CUMPLE",
+};
     });
 
     const { error } = await supabase
@@ -1079,7 +1089,78 @@ onChange={(e) => {
     <div className="text-sm">
       <b>Ubicación específica:</b> {item.specific_site}
     </div>
+<div className="border rounded p-3 bg-neutral-50 space-y-3">
+  <div className="text-sm font-semibold">
+    Trazabilidad de ubicación
+  </div>
 
+  <div className="text-sm">
+    <b>Ubicación registrada:</b>{" "}
+    {item.registered_location || item.location || "—"}
+  </div>
+
+  {item.registered_well_services_unit && (
+    <div className="text-sm">
+      <b>Unidad registrada:</b>{" "}
+      {item.registered_well_services_unit}
+    </div>
+  )}
+
+  <Field label="Ubicación encontrada">
+    <select
+      className="border p-2 rounded"
+      value={item.found_location || ""}
+      onChange={(e) => {
+        const updated = [...monthlyItems];
+
+        updated[index] = {
+          ...updated[index],
+          found_location: e.target.value,
+          found_well_services_unit:
+            e.target.value === "Well Services"
+              ? updated[index].found_well_services_unit || ""
+              : "",
+        };
+
+        setMonthlyItems(updated);
+      }}
+    >
+      <option value="">Seleccione ubicación</option>
+      <option value="Base Tocancipa">Base Tocancipa</option>
+      <option value="Base Palermo">Base Palermo</option>
+      <option value="Lote La Florida">Lote La Florida</option>
+      <option value="Well Services">Well Services</option>
+      <option value="Rig E2027">Rig E2027</option>
+      <option value="Otros">Otros</option>
+    </select>
+  </Field>
+
+  {item.found_location === "Well Services" && (
+    <Field label="Unidad encontrada">
+      <select
+        className="border p-2 rounded"
+        value={item.found_well_services_unit || ""}
+        onChange={(e) => {
+          const updated = [...monthlyItems];
+
+          updated[index] = {
+            ...updated[index],
+            found_well_services_unit: e.target.value,
+          };
+
+          setMonthlyItems(updated);
+        }}
+      >
+        <option value="">Seleccione unidad</option>
+        {WELL_SERVICES_UNITS.map((unit) => (
+          <option key={unit} value={unit}>
+            {unit}
+          </option>
+        ))}
+      </select>
+    </Field>
+  )}
+</div>
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {[
         ["cylinder_status", "Cilindro"],
