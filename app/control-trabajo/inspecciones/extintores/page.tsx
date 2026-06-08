@@ -147,6 +147,10 @@ const [extinguishers, setExtinguishers] = useState<FireExtinguisher[]>([]);
 const [searchTerm, setSearchTerm] = useState("");
 const [locationFilter, setLocationFilter] = useState("");
 const [resultFilter, setResultFilter] = useState("");
+const [monthlyLocation, setMonthlyLocation] = useState("");
+const [monthlyDate, setMonthlyDate] = useState("");
+const [monthlyInspector, setMonthlyInspector] = useState("");
+const [monthlyItems, setMonthlyItems] = useState<any[]>([]);
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -405,11 +409,46 @@ const filteredExtinguishers = extinguishers.filter((item) => {
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
+function loadMonthlyItemsByLocation(location: string) {
+  const items = extinguishers
+    .filter((item) => item.location === location)
+    .map((item) => ({
+      ...item,
+      cylinder_status: "B",
+      gauge_status: "B",
+      pressure_status: "B",
+      hose_status: "B",
+      nozzle_status: "B",
+      trigger_status: "B",
+      seal_status: "B",
+      observations: "",
+      result: "CUMPLE",
+    }));
+
+  setMonthlyItems(items);
+}
 
   return !term || searchableText.includes(term);
 });
 
+function loadMonthlyItemsByLocation(location: string) {
+  const items = extinguishers
+    .filter((item) => item.location === location)
+    .map((item) => ({
+      ...item,
+      cylinder_status: "B",
+      gauge_status: "B",
+      pressure_status: "B",
+      hose_status: "B",
+      nozzle_status: "B",
+      trigger_status: "B",
+      seal_status: "B",
+      observations: "",
+      result: "CUMPLE",
+    }));
 
+  setMonthlyItems(items);
+}
   return (
     <main className="min-h-screen bg-white text-neutral-900">
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -772,6 +811,136 @@ const filteredExtinguishers = extinguishers.filter((item) => {
   {saving ? "Guardando..." : "Guardar extintor"}
 </button>
 
+  </section>
+)}
+
+{viewMode === "monthlyInspection" && (
+  <section className="border rounded-xl p-4 space-y-4 bg-white shadow-sm">
+    <div className="bg-red-700 text-white text-center font-bold py-2 rounded">
+      INSPECCIÓN MENSUAL DE EXTINTORES
+    </div>
+
+    <button
+      type="button"
+      onClick={() => setViewMode("menu")}
+      className="border rounded px-4 py-2 text-sm bg-white"
+    >
+      ← Volver al menú
+    </button>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+  <Field label="Unidad Operativa / Departamento">
+    <select
+      className="border p-2 rounded"
+      value={monthlyLocation}
+      onChange={(e) => {
+        setMonthlyLocation(e.target.value);
+        loadMonthlyItemsByLocation(e.target.value);
+      }}
+    >
+      <option value="">Seleccione ubicación</option>
+      <option value="Base Tocancipa">Base Tocancipa</option>
+      <option value="Base Palermo">Base Palermo</option>
+      <option value="Lote La Florida">Lote La Florida</option>
+      <option value="Well Services">Well Services</option>
+      <option value="Rig E2027">Rig E2027</option>
+      <option value="Otros">Otros</option>
+    </select>
+  </Field>
+
+  <Field label="Fecha de inspección">
+    <input
+      type="date"
+      className="border p-2 rounded"
+      value={monthlyDate}
+      onChange={(e) => setMonthlyDate(e.target.value)}
+    />
+  </Field>
+
+  <Field label="Inspeccionado por">
+    <input
+      className="border p-2 rounded"
+      value={monthlyInspector}
+      onChange={(e) => setMonthlyInspector(e.target.value)}
+    />
+  </Field>
+</div>
+
+<div className="text-sm text-neutral-600">
+  Extintores cargados para inspección: <b>{monthlyItems.length}</b>
+</div>
+
+{monthlyItems.map((item, index) => (
+  <div
+    key={item.id}
+    className="border rounded-xl p-4 bg-white space-y-3"
+  >
+    <div className="font-bold text-lg">
+      {item.extinguisher_code}
+    </div>
+
+    <div className="text-sm text-neutral-600">
+      {item.location}
+    </div>
+
+    <div className="text-sm">
+      <b>Ubicación específica:</b> {item.specific_site}
+    </div>
+
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {[
+        ["cylinder_status", "Cilindro"],
+        ["gauge_status", "Manómetro"],
+        ["pressure_status", "Presión"],
+        ["hose_status", "Manguera"],
+        ["nozzle_status", "Boquilla"],
+        ["trigger_status", "Gatillo"],
+        ["seal_status", "Precinto"],
+      ].map(([field, label]) => (
+        <div key={field}>
+          <label className="text-xs font-medium">
+            {label}
+          </label>
+
+          <select
+            className="border p-2 rounded w-full"
+            value={item[field]}
+            onChange={(e) => {
+              const updated = [...monthlyItems];
+
+              updated[index] = {
+                ...updated[index],
+                [field]: e.target.value,
+              };
+
+              setMonthlyItems(updated);
+            }}
+          >
+            <option value="B">B - Bien</option>
+            <option value="M">M - Mal</option>
+            <option value="NA">N/A</option>
+          </select>
+        </div>
+      ))}
+    </div>
+
+    <textarea
+      className="border p-2 rounded w-full"
+      placeholder="Observaciones"
+      value={item.observations}
+      onChange={(e) => {
+        const updated = [...monthlyItems];
+
+        updated[index] = {
+          ...updated[index],
+          observations: e.target.value,
+        };
+
+        setMonthlyItems(updated);
+      }}
+    />
+  </div>
+))}
   </section>
 )}
 
