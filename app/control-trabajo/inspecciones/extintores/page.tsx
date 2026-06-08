@@ -44,6 +44,7 @@ type FireExtinguisher = {
   created_at: string;
   extinguisher_code: string;
   location: string;
+well_services_unit: string;
   specific_site: string;
   brand: string;
   class: string;
@@ -235,13 +236,18 @@ async function saveExtinguisher() {
 
     const payload = {
       extinguisher_code: form.extinguisher_code,
-      location:
-        form.location === "Well Services"
-          ? `Well Services - ${form.well_services_unit || ""}`
-          : form.location === "Otros"
-          ? form.location_other
-          : form.location,
-      specific_site: form.located_at,
+location:
+  form.location === "Otros"
+    ? form.location_other
+    : form.location,
+
+well_services_unit:
+  form.location === "Well Services"
+    ? form.well_services_unit
+    : "",
+
+specific_site: form.located_at,     
+
       brand: form.brand,
       class: form.class,
       type: form.type,
