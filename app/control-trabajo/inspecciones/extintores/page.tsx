@@ -159,6 +159,8 @@ const [monthlyDate, setMonthlyDate] = useState("");
 const [monthlyInspector, setMonthlyInspector] = useState("");
 const [monthlyCodeSearch, setMonthlyCodeSearch] = useState("");
 const [monthlyItems, setMonthlyItems] = useState<any[]>([]);
+const [monthlyRecords, setMonthlyRecords] = useState<any[]>([]);
+
 const [selectedExtinguisher, setSelectedExtinguisher] =
   useState<FireExtinguisher | null>(null);
 const [editPassword, setEditPassword] = useState("");
@@ -196,6 +198,19 @@ async function loadExtinguishers() {
   setExtinguishers((data || []) as FireExtinguisher[]);
 }
 
+async function loadMonthlyRecords() {
+  const { data, error } = await supabase
+    .from("fire_extinguisher_monthly_inspections")
+    .select("*")
+    .order("inspection_date", { ascending: false });
+
+  if (error) {
+    setUiError(error.message);
+    return;
+  }
+
+  setMonthlyRecords(data || []);
+}
 async function uploadPhoto() {
   if (!photoFile) return "";
 
@@ -371,8 +386,8 @@ function addFiveYearsToMonthEnd(monthValue: string) {
  useEffect(() => {
   loadRecords();
   loadExtinguishers();
+  loadMonthlyRecords();
 }, []);
-
 
 const filteredRecords = records.filter((item) => {
   const term = searchTerm.trim().toLowerCase();
@@ -410,6 +425,16 @@ const filteredRecords = records.filter((item) => {
     matchesResult
   );
 });
+
+function getLastInspectionDate(code: string) {
+  const found = monthlyRecords.find(
+    (item) =>
+      String(item.extinguisher_code || "").trim().toLowerCase() ===
+      String(code || "").trim().toLowerCase()
+  );
+
+  return found?.inspection_date || "";
+}
 
 const filteredExtinguishers = extinguishers.filter((item) => {
   const term = searchTerm.trim().toLowerCase();
@@ -704,12 +729,13 @@ for (const item of monthlyItems) {
     .eq("id", item.id);
 }
 
-    setUiInfo("✅ Inspección mensual guardada correctamente.");
     setMonthlyItems([]);
-    setMonthlyLocation("");
-    setMonthlyDate("");
-    setMonthlyInspector("");
-    setViewMode("list");
+setMonthlyCodeSearch("");
+await loadMonthlyRecords();
+await loadExtinguishers();
+setUiInfo(
+  "✅ Inspección guardada correctamente. Busca el siguiente extintor."
+);
   } catch (err: any) {
     setUiError(err?.message || "Error guardando inspección mensual.");
   } finally {
@@ -1686,6 +1712,10 @@ Resultados: <b>{filteredExtinguishers.length}</b> de{" "}
           <div className="text-sm">
             <b>Venc. P.H.:</b> {item.hydrostatic_expiry_date || "—"}
           </div>
+<div className="text-sm">
+  <b>Última inspección:</b>{" "}
+  {getLastInspectionDate(item.extinguisher_code) || "Sin registro"}
+</div>
 
          <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-green-700 text-white">
   {item.status || "ACTIVE"}
