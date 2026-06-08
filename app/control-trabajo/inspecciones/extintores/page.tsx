@@ -149,10 +149,12 @@ const [searchTerm, setSearchTerm] = useState("");
 const [locationFilter, setLocationFilter] = useState("");
 const [resultFilter, setResultFilter] = useState("");
 const [monthlyLocation, setMonthlyLocation] = useState("");
+const [monthlyUnit, setMonthlyUnit] = useState("");
 const [monthlyDate, setMonthlyDate] = useState("");
 const [monthlyInspector, setMonthlyInspector] = useState("");
-const [monthlyUnit, setMonthlyUnit] = useState("");
+const [monthlyCodeSearch, setMonthlyCodeSearch] = useState("");
 const [monthlyItems, setMonthlyItems] = useState<any[]>([]);
+
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -459,6 +461,60 @@ function loadMonthlyItemsByLocation(
 }))
 
   setMonthlyItems(items);
+}
+function loadMonthlyItemByCode(code: string) {
+  const cleanCode = code.trim().toLowerCase();
+
+  if (!cleanCode) return;
+
+  const found = extinguishers.find(
+    (item) =>
+      String(item.extinguisher_code || "")
+        .trim()
+        .toLowerCase() === cleanCode
+  );
+
+  if (!found) {
+    setUiError("No se encontró ningún extintor con ese código.");
+    return;
+  }
+
+  setUiError("");
+
+  const itemToInspect = {
+    ...found,
+
+    registered_location: found.location,
+    registered_well_services_unit:
+      found.well_services_unit || "",
+
+    found_location: monthlyLocation || found.location,
+    found_well_services_unit:
+      monthlyLocation === "Well Services"
+        ? monthlyUnit
+        : "",
+
+    cylinder_status: "B",
+    gauge_status: "B",
+    pressure_status: "B",
+    hose_status: "B",
+    nozzle_status: "B",
+    trigger_status: "B",
+    seal_status: "B",
+    observations: "",
+    result: "CUMPLE",
+  };
+
+  setMonthlyItems((prev) => {
+    const alreadyLoaded = prev.some(
+      (item) =>
+        item.extinguisher_code === itemToInspect.extinguisher_code
+    );
+
+    if (alreadyLoaded) return prev;
+
+    return [...prev, itemToInspect];
+  });
 }
 
 async function saveMonthlyInspection() {
@@ -974,6 +1030,33 @@ onChange={(e) => {
       onChange={(e) => setMonthlyInspector(e.target.value)}
     />
   </Field>
+</div>
+
+<div className="border rounded-xl p-4 bg-neutral-50 space-y-3">
+  <div className="font-semibold">
+    Buscar extintor por código
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <input
+      className="border p-2 rounded md:col-span-2"
+      placeholder="Digite el código del extintor"
+      value={monthlyCodeSearch}
+      onChange={(e) => setMonthlyCodeSearch(e.target.value)}
+    />
+
+    <button
+      type="button"
+      onClick={() => loadMonthlyItemByCode(monthlyCodeSearch)}
+      className="bg-black text-white rounded px-4 py-2 font-medium"
+    >
+      Agregar extintor
+    </button>
+  </div>
+
+  <div className="text-xs text-neutral-500">
+    Use este campo cuando el extintor encontrado no corresponde a la ubicación seleccionada.
+  </div>
 </div>
 
 <div className="text-sm text-neutral-600">
