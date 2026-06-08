@@ -597,7 +597,7 @@ async function saveMonthlyInspection() {
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-      <Field label="Fecha de inspección">
+      <Field label="Fecha de registro">
         <input
           type="date"
           className="border p-2 rounded"
@@ -606,13 +606,6 @@ async function saveMonthlyInspection() {
         />
       </Field>
 
-      <Field label="Inspeccionado por">
-        <input
-          className="border p-2 rounded"
-          value={form.inspector_name}
-          onChange={(e) => updateField("inspector_name", e.target.value)}
-        />
-      </Field>
 
       <Field label="Código / No.">
         <input
