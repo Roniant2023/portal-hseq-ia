@@ -1099,9 +1099,12 @@ onChange={(e) => {
       {item.location}
     </div>
 
-    <div className="text-sm">
-      <b>Ubicación específica:</b> {item.specific_site}
-    </div>
+   <div className="text-sm">
+  <b>Ubicación:</b>{" "}
+  {item.location === "Well Services" && item.well_services_unit
+    ? `Well Services - ${item.well_services_unit}`
+    : item.location || "—"}
+</div>
 <div className="border rounded p-3 bg-neutral-50 space-y-3">
   <div className="text-sm font-semibold">
     Trazabilidad de ubicación
@@ -1349,7 +1352,11 @@ Resultados: <b>{filteredExtinguishers.length}</b> de{" "}
           <div className="text-sm">
             <b>Sitio específico:</b> {item.specific_site || "—"}
           </div>
-
+{item.location === "Well Services" && item.well_services_unit && (
+  <div className="text-sm">
+    <b>Unidad:</b> {item.well_services_unit}
+  </div>
+)}
           <div className="text-sm">
             <b>Estado:</b> {item.status || "—"}
           </div>
