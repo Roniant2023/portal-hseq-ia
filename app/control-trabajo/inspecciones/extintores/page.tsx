@@ -427,7 +427,10 @@ function loadMonthlyItemsByLocation(
   const items = extinguishers
     .filter((item) => {
       if (location === "Well Services") {
-        return item.location === `Well Services - ${unit}`;
+        return (
+          item.location === "Well Services" &&
+          item.well_services_unit === unit
+        );
       }
 
       return item.location === location;
