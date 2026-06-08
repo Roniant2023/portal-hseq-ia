@@ -585,6 +585,19 @@ async function saveMonthlyInspection() {
       return;
     }
 
+for (const item of monthlyItems) {
+  await supabase
+    .from("fire_extinguishers")
+    .update({
+      location: item.found_location || item.location,
+      well_services_unit:
+        item.found_location === "Well Services"
+          ? item.found_well_services_unit || ""
+          : "",
+    })
+    .eq("id", item.id);
+}
+
     setUiInfo("✅ Inspección mensual guardada correctamente.");
     setMonthlyItems([]);
     setMonthlyLocation("");
