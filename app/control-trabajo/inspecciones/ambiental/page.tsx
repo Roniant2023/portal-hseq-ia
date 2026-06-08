@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -131,6 +131,7 @@ const [viewMode, setViewMode] = useState<ViewMode>("menu");
 const [saving, setSaving] = useState(false);
 const [uiInfo, setUiInfo] = useState("");
 const [uiError, setUiError] = useState("");
+const [records, setRecords] = useState<any[]>([]);
 const [openSections, setOpenSections] = useState({
   orderCleanliness: true,
   environmentalKit: false,
@@ -296,6 +297,24 @@ async function saveInspection() {
     setSaving(false);
   }
 }
+
+async function loadRecords() {
+  const { data, error } = await supabase
+    .from("environmental_inspections")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    setUiError(error.message);
+    return;
+  }
+
+  setRecords(data || []);
+}
+
+useEffect(() => {
+  loadRecords();
+}, []);
 
   return (
     <main className="min-h-screen bg-white text-neutral-900">
@@ -927,9 +946,44 @@ async function saveInspection() {
               ← Volver al menú
             </button>
 
-            <div className="text-center text-neutral-500 py-10">
-              Consulta de inspecciones ambientales en construcción...
-            </div>
+           <div className="space-y-3">
+  <div className="font-bold text-lg">
+    Inspecciones registradas
+  </div>
+
+  {records.length === 0 && (
+    <div className="text-sm text-neutral-500">
+      No hay inspecciones registradas.
+    </div>
+  )}
+
+  {records.map((record) => (
+    <div
+      key={record.id}
+      className="border rounded-xl p-4 bg-white shadow-sm space-y-2"
+    >
+      <div className="font-bold">
+        {record.inspection_date || "Sin fecha"} — {record.result || "Sin resultado"}
+      </div>
+
+      <div className="text-sm text-neutral-600">
+        Inspector: {record.inspector_name || "No registrado"}
+      </div>
+
+      <div className="text-sm text-neutral-600">
+        Ubicación: {record.location || "No registrada"}
+      </div>
+
+      <div className="text-sm text-neutral-600">
+        Sitio específico: {record.specific_site || "No registrado"}
+      </div>
+
+      <div className="text-sm text-neutral-600">
+        Pozo: {record.well || "No registrado"}
+      </div>
+    </div>
+  ))}
+</div>
 
           </section>
         )}
