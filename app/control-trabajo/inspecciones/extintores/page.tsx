@@ -514,16 +514,8 @@ function loadMonthlyItemByCode(code: string) {
     result: "CUMPLE",
   };
 
-  setMonthlyItems((prev) => {
-    const alreadyLoaded = prev.some(
-      (item) =>
-        item.extinguisher_code === itemToInspect.extinguisher_code
-    );
-
-    if (alreadyLoaded) return prev;
-
-    return [...prev, itemToInspect];
-  });
+  setMonthlyItems([itemToInspect]);
+setMonthlyCodeSearch("");
 }
 function openEditExtinguisher(item: FireExtinguisher) {
   setSelectedExtinguisher(item);
@@ -1327,13 +1319,13 @@ for (const item of monthlyItems) {
       onChange={(e) => setMonthlyCodeSearch(e.target.value)}
     />
 
-    <button
-      type="button"
-      onClick={() => loadMonthlyItemByCode(monthlyCodeSearch)}
-      className="bg-black text-white rounded px-4 py-2 font-medium"
-    >
-      Agregar extintor
-    </button>
+   <button
+  type="button"
+  onClick={() => loadMonthlyItemByCode(monthlyCodeSearch)}
+  className="bg-black text-white rounded px-4 py-2 font-medium"
+>
+  Buscar extintor
+</button>
   </div>
 
   <div className="text-xs text-neutral-500">
@@ -1346,17 +1338,14 @@ for (const item of monthlyItems) {
     <select
       className="border p-2 rounded"
       value={monthlyLocation}
+
 onChange={(e) => {
   const value = e.target.value;
 
   setMonthlyLocation(value);
   setMonthlyUnit("");
   setMonthlyItems([]);
-
-  if (value !== "Well Services") {
-    loadMonthlyItemsByLocation(value);
-  }
-}}      
+}}  
 
     >
       <option value="">Seleccione ubicación</option>
@@ -1374,15 +1363,9 @@ onChange={(e) => {
       className="border p-2 rounded"
       value={monthlyUnit}
       onChange={(e) => {
-        const unit = e.target.value;
-
-        setMonthlyUnit(unit);
-
-        loadMonthlyItemsByLocation(
-          "Well Services",
-          unit
-        );
-      }}
+  setMonthlyUnit(e.target.value);
+  setMonthlyItems([]);
+}}
     >
       <option value="">
         Seleccione unidad
@@ -1416,7 +1399,9 @@ onChange={(e) => {
 </div>
 
 <div className="text-sm text-neutral-600">
-  Extintores cargados para inspección: <b>{monthlyItems.length}</b>
+  {monthlyItems.length > 0
+    ? "Extintor listo para inspección"
+    : "Busque un extintor por código"}
 </div>
 
 {monthlyItems.map((item, index) => (
