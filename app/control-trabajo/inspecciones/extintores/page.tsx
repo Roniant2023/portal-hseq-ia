@@ -702,6 +702,34 @@ for (const item of monthlyItems) {
       >
         ← Volver al menú
       </button>
+
+<div className="border rounded-xl p-4 bg-neutral-50 space-y-3">
+  <div className="font-semibold">
+    Buscar extintor por código
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <input
+      className="border p-2 rounded md:col-span-2"
+      placeholder="Digite el código del extintor"
+      value={monthlyCodeSearch}
+      onChange={(e) => setMonthlyCodeSearch(e.target.value)}
+    />
+
+    <button
+      type="button"
+      onClick={() => loadMonthlyItemByCode(monthlyCodeSearch)}
+      className="bg-black text-white rounded px-4 py-2 font-medium"
+    >
+      Agregar extintor
+    </button>
+  </div>
+
+  <div className="text-xs text-neutral-500">
+    Use este campo cuando el extintor encontrado no corresponde a la ubicación seleccionada.
+  </div>
+</div>
+
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1053,33 +1081,6 @@ onChange={(e) => {
       onChange={(e) => setMonthlyInspector(e.target.value)}
     />
   </Field>
-</div>
-
-<div className="border rounded-xl p-4 bg-neutral-50 space-y-3">
-  <div className="font-semibold">
-    Buscar extintor por código
-  </div>
-
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-    <input
-      className="border p-2 rounded md:col-span-2"
-      placeholder="Digite el código del extintor"
-      value={monthlyCodeSearch}
-      onChange={(e) => setMonthlyCodeSearch(e.target.value)}
-    />
-
-    <button
-      type="button"
-      onClick={() => loadMonthlyItemByCode(monthlyCodeSearch)}
-      className="bg-black text-white rounded px-4 py-2 font-medium"
-    >
-      Agregar extintor
-    </button>
-  </div>
-
-  <div className="text-xs text-neutral-500">
-    Use este campo cuando el extintor encontrado no corresponde a la ubicación seleccionada.
-  </div>
 </div>
 
 <div className="text-sm text-neutral-600">
