@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-
+import { createClient } from "@supabase/supabase-js";
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+);
 type ViewMode = "menu" | "new" | "list";
 
 const ORDER_CLEANLINESS_ITEMS = [
@@ -124,7 +128,9 @@ const HYDRAULIC_NETWORK_ITEMS = [
 
 export default function AmbientalPage() {
 const [viewMode, setViewMode] = useState<ViewMode>("menu");
-
+const [saving, setSaving] = useState(false);
+const [uiInfo, setUiInfo] = useState("");
+const [uiError, setUiError] = useState("");
 const [openSections, setOpenSections] = useState({
   orderCleanliness: true,
   environmentalKit: false,
@@ -209,6 +215,87 @@ function updateField(key: string, value: any) {
   }));
 }
 
+function calculateResult() {
+  const checks = [
+    ...form.order_cleanliness,
+    ...form.ecological_point,
+    ...form.chemical_storage,
+    ...form.water_treatment,
+    ...form.hydraulic_network,
+  ];
+
+  const kitFailures = form.environmental_kit.some(
+    (item) => item.available === "NO" || item.status === "M" || item.status === "RC"
+  );
+
+  const bathroomFailures = form.bathrooms.some((bathroom) =>
+    bathroom.items.some((item) => item.status === "ME")
+  );
+
+  const checklistFailures = checks.some(
+    (item) => item.answer === "NO CUMPLE"
+  );
+
+  return checklistFailures || kitFailures || bathroomFailures
+    ? "NO CUMPLE"
+    : "CUMPLE";
+}
+
+async function saveInspection() {
+  try {
+    setSaving(true);
+    setUiError("");
+    setUiInfo("");
+
+    if (!form.inspection_date) {
+      setUiError("Debes diligenciar la fecha de inspección.");
+      return;
+    }
+
+    const result = calculateResult();
+
+    const payload = {
+      inspection_date: form.inspection_date,
+      inspector_name: form.inspector_name,
+      work_front: form.work_front,
+      unit: form.unit,
+      operator: form.operator,
+      well: form.well,
+      location:
+        form.location === "Otros" ? form.location_other : form.location,
+      location_other: form.location_other,
+      specific_site: form.specific_site,
+
+      order_cleanliness: form.order_cleanliness,
+      environmental_kit: form.environmental_kit,
+      ecological_point: form.ecological_point,
+      chemical_storage: form.chemical_storage,
+      bathrooms: form.bathrooms,
+      water_treatment: form.water_treatment,
+      hydraulic_network: form.hydraulic_network,
+
+      result,
+      observations: "",
+      photo_urls: [],
+    };
+
+    const { error } = await supabase
+      .from("environmental_inspections")
+      .insert(payload);
+
+    if (error) {
+      setUiError(error.message);
+      return;
+    }
+
+    setUiInfo("✅ Inspección ambiental guardada correctamente.");
+    setViewMode("list");
+  } catch (err: any) {
+    setUiError(err?.message || "Error guardando inspección ambiental.");
+  } finally {
+    setSaving(false);
+  }
+}
 
   return (
     <main className="min-h-screen bg-white text-neutral-900">
@@ -822,7 +909,26 @@ function updateField(key: string, value: any) {
             <div className="text-center text-neutral-500 py-10">
               Consulta de inspecciones ambientales en construcción...
             </div>
+<button
+  type="button"
+  onClick={saveInspection}
+  disabled={saving}
+  className="w-full bg-green-700 text-white py-3 rounded font-semibold disabled:opacity-50"
+>
+  {saving ? "Guardando..." : "Guardar inspección ambiental"}
+</button>
 
+{uiInfo && (
+  <div className="border rounded p-3 bg-green-50 border-green-200 text-green-800 text-sm">
+    {uiInfo}
+  </div>
+)}
+
+{uiError && (
+  <div className="border rounded p-3 bg-red-50 border-red-200 text-red-800 text-sm">
+    {uiError}
+  </div>
+)}
           </section>
         )}
 
