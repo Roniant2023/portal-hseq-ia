@@ -8,7 +8,12 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-type ViewMode = "menu" | "newExtinguisher" | "monthlyInspection" | "list";
+type ViewMode =
+  | "menu"
+  | "newExtinguisher"
+  | "monthlyInspection"
+  | "list"
+  | "editExtinguisher";
 
 type ExtinguisherInspection = {
   id: string;
@@ -154,6 +159,8 @@ const [monthlyDate, setMonthlyDate] = useState("");
 const [monthlyInspector, setMonthlyInspector] = useState("");
 const [monthlyCodeSearch, setMonthlyCodeSearch] = useState("");
 const [monthlyItems, setMonthlyItems] = useState<any[]>([]);
+const [selectedExtinguisher, setSelectedExtinguisher] =
+  useState<FireExtinguisher | null>(null);
 
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -516,7 +523,28 @@ function loadMonthlyItemByCode(code: string) {
     return [...prev, itemToInspect];
   });
 }
+function openEditExtinguisher(item: FireExtinguisher) {
+  setSelectedExtinguisher(item);
 
+  setForm({
+    ...emptyForm,
+    extinguisher_code: item.extinguisher_code || "",
+    location: item.location || "",
+    well_services_unit: item.well_services_unit || "",
+    located_at: item.specific_site || "",
+    brand: item.brand || "",
+    class: item.class || "",
+    type: item.type || "",
+    capacity: item.capacity || "",
+    charge_expiry_date: item.charge_expiry_date || "",
+    hydrostatic_test_date: item.hydrostatic_test_date || "",
+    hydrostatic_expiry_date: item.hydrostatic_expiry_date || "",
+    photo_url: item.photo_url || "",
+  });
+
+  setPhotoFile(null);
+  setViewMode("editExtinguisher");
+}
 async function saveMonthlyInspection() {
   try {
     setSaving(true);
