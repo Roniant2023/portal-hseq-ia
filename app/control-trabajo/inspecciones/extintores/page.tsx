@@ -545,6 +545,68 @@ function openEditExtinguisher(item: FireExtinguisher) {
   setPhotoFile(null);
   setViewMode("editExtinguisher");
 }
+
+async function updateExtinguisher() {
+  try {
+    setSaving(true);
+    setUiError("");
+    setUiInfo("");
+
+    if (!selectedExtinguisher) {
+      setUiError("No hay extintor seleccionado para editar.");
+      return;
+    }
+
+    if (!form.extinguisher_code.trim()) {
+      setUiError("Debes diligenciar el código del extintor.");
+      return;
+    }
+
+    const photoUrl = await uploadPhoto();
+
+    const payload = {
+      extinguisher_code: form.extinguisher_code,
+      location:
+        form.location === "Otros"
+          ? form.location_other
+          : form.location,
+      well_services_unit:
+        form.location === "Well Services"
+          ? form.well_services_unit
+          : "",
+      specific_site: form.located_at,
+      brand: form.brand,
+      class: form.class,
+      type: form.type,
+      capacity: form.capacity,
+      charge_expiry_date: form.charge_expiry_date,
+      hydrostatic_test_date: form.hydrostatic_test_date,
+      hydrostatic_expiry_date: form.hydrostatic_expiry_date,
+      photo_url: photoUrl || form.photo_url,
+    };
+
+    const { error } = await supabase
+      .from("fire_extinguishers")
+      .update(payload)
+      .eq("id", selectedExtinguisher.id);
+
+    if (error) {
+      setUiError(error.message);
+      return;
+    }
+
+    setUiInfo("✅ Extintor actualizado correctamente.");
+    setSelectedExtinguisher(null);
+    setForm(emptyForm);
+    setPhotoFile(null);
+    await loadExtinguishers();
+    setViewMode("list");
+  } catch (err: any) {
+    setUiError(err?.message || "Error actualizando extintor.");
+  } finally {
+    setSaving(false);
+  }
+}
 async function saveMonthlyInspection() {
   try {
     setSaving(true);
@@ -998,6 +1060,97 @@ for (const item of monthlyItems) {
   </section>
 )}
 
+{viewMode === "editExtinguisher" && (
+  <section className="border rounded-xl p-4 space-y-4 bg-white shadow-sm">
+    <div className="bg-red-700 text-white text-center font-bold py-2 rounded">
+      EDITAR EXTINTOR
+    </div>
+
+    <button
+      type="button"
+      onClick={() => setViewMode("list")}
+      className="border rounded px-4 py-2 text-sm bg-white"
+    >
+      ← Volver a consulta
+    </button>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <Field label="Código / No.">
+        <input className="border p-2 rounded" value={form.extinguisher_code}
+          onChange={(e) => updateField("extinguisher_code", e.target.value)} />
+      </Field>
+
+      <Field label="Ubicación">
+        <select className="border p-2 rounded" value={form.location}
+          onChange={(e) => updateField("location", e.target.value)}>
+          <option value="">Seleccione ubicación</option>
+          <option value="Base Tocancipa">Base Tocancipa</option>
+          <option value="Base Palermo">Base Palermo</option>
+          <option value="Lote La Florida">Lote La Florida</option>
+          <option value="Well Services">Well Services</option>
+          <option value="Rig E2027">Rig E2027</option>
+          <option value="Otros">Otros</option>
+        </select>
+      </Field>
+
+      {form.location === "Well Services" && (
+        <Field label="Unidad Well Services">
+          <select className="border p-2 rounded" value={form.well_services_unit}
+            onChange={(e) => updateField("well_services_unit", e.target.value)}>
+            <option value="">Seleccione unidad</option>
+            {WELL_SERVICES_UNITS.map((unit) => (
+              <option key={unit} value={unit}>{unit}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+
+      <Field label="Sitio específico">
+        <input className="border p-2 rounded" value={form.located_at}
+          onChange={(e) => updateField("located_at", e.target.value)} />
+      </Field>
+
+      <Field label="Marca">
+        <input className="border p-2 rounded" value={form.brand}
+          onChange={(e) => updateField("brand", e.target.value)} />
+      </Field>
+
+      <Field label="Clase">
+        <select className="border p-2 rounded" value={form.class}
+          onChange={(e) => updateField("class", e.target.value)}>
+          <option value="">Seleccione</option>
+          <option value="ABC">ABC</option>
+          <option value="BC">BC</option>
+        </select>
+      </Field>
+
+      <Field label="Tipo">
+        <select className="border p-2 rounded" value={form.type}
+          onChange={(e) => updateField("type", e.target.value)}>
+          <option value="">Seleccione</option>
+          <option value="PQ">PQ</option>
+          <option value="CO2">CO2</option>
+        </select>
+      </Field>
+
+      <Field label="Capacidad">
+        <input className="border p-2 rounded" value={form.capacity}
+          onChange={(e) => updateField("capacity", e.target.value)} />
+      </Field>
+    </div>
+
+    <button
+      type="button"
+      onClick={updateExtinguisher}
+      disabled={saving}
+      className="w-full bg-black text-white py-3 rounded font-semibold disabled:opacity-50"
+    >
+      {saving ? "Actualizando..." : "Guardar cambios"}
+    </button>
+  </section>
+)}
+
+
 {viewMode === "monthlyInspection" && (
   <section className="border rounded-xl p-4 space-y-4 bg-white shadow-sm">
     <div className="bg-red-700 text-white text-center font-bold py-2 rounded">
@@ -1404,6 +1557,13 @@ Resultados: <b>{filteredExtinguishers.length}</b> de{" "}
   {item.status || "ACTIVE"}
 </span>
 
+<button
+  type="button"
+  onClick={() => openEditExtinguisher(item)}
+  className="w-full border rounded px-3 py-2 text-sm font-medium"
+>
+  Editar
+</button>
           
         </div>
       ))}
