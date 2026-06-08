@@ -892,23 +892,7 @@ async function saveInspection() {
     </div>
   ))}
 </div>
-          </section>
-        )}
 
-        {viewMode === "list" && (
-          <section className="border rounded-xl p-6 bg-white shadow-sm space-y-4">
-
-            <button
-              type="button"
-              onClick={() => setViewMode("menu")}
-              className="border rounded px-4 py-2"
-            >
-              ← Volver al menú
-            </button>
-
-            <div className="text-center text-neutral-500 py-10">
-              Consulta de inspecciones ambientales en construcción...
-            </div>
 <button
   type="button"
   onClick={saveInspection}
@@ -929,6 +913,24 @@ async function saveInspection() {
     {uiError}
   </div>
 )}
+          </section>
+        )}
+
+        {viewMode === "list" && (
+          <section className="border rounded-xl p-6 bg-white shadow-sm space-y-4">
+
+            <button
+              type="button"
+              onClick={() => setViewMode("menu")}
+              className="border rounded px-4 py-2"
+            >
+              ← Volver al menú
+            </button>
+
+            <div className="text-center text-neutral-500 py-10">
+              Consulta de inspecciones ambientales en construcción...
+            </div>
+
           </section>
         )}
 
