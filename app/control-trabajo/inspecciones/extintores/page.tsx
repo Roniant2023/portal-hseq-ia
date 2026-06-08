@@ -435,18 +435,28 @@ function loadMonthlyItemsByLocation(
 
       return item.location === location;
     })
-    .map((item) => ({
-      ...item,
-      cylinder_status: "B",
-      gauge_status: "B",
-      pressure_status: "B",
-      hose_status: "B",
-      nozzle_status: "B",
-      trigger_status: "B",
-      seal_status: "B",
-      observations: "",
-      result: "CUMPLE",
-    }));
+    
+.map((item) => ({
+  ...item,
+
+  registered_location: item.location,
+  registered_well_services_unit:
+    item.well_services_unit || "",
+
+  found_location: item.location,
+  found_well_services_unit:
+    item.well_services_unit || "",
+
+  cylinder_status: "B",
+  gauge_status: "B",
+  pressure_status: "B",
+  hose_status: "B",
+  nozzle_status: "B",
+  trigger_status: "B",
+  seal_status: "B",
+  observations: "",
+  result: "CUMPLE",
+}))
 
   setMonthlyItems(items);
 }
