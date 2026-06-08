@@ -39,6 +39,22 @@ type ExtinguisherInspection = {
   action_required: string;
   photo_url: string;
 };
+type FireExtinguisher = {
+  id: string;
+  created_at: string;
+  extinguisher_code: string;
+  location: string;
+  specific_site: string;
+  brand: string;
+  class: string;
+  type: string;
+  capacity: string;
+  charge_expiry_date: string;
+  hydrostatic_test_date: string;
+  hydrostatic_expiry_date: string;
+  status: string;
+  photo_url: string;
+};
 
 const emptyForm = {
   inspection_date: "",
@@ -123,6 +139,7 @@ export default function ExtintoresPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("menu");
   const [form, setForm] = useState(emptyForm);
   const [records, setRecords] = useState<ExtinguisherInspection[]>([]);
+const [extinguishers, setExtinguishers] = useState<FireExtinguisher[]>([]);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [uiInfo, setUiInfo] = useState("");
@@ -147,6 +164,20 @@ const [resultFilter, setResultFilter] = useState("");
 
     setRecords((data || []) as ExtinguisherInspection[]);
   }
+
+async function loadExtinguishers() {
+  const { data, error } = await supabase
+    .from("fire_extinguishers")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    setUiError(error.message);
+    return;
+  }
+
+  setExtinguishers((data || []) as FireExtinguisher[]);
+}
 
 async function uploadPhoto() {
   if (!photoFile) return "";
@@ -314,9 +345,10 @@ function addFiveYearsToMonthEnd(monthValue: string) {
   return `${targetYear}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 }
 
-  useEffect(() => {
-    loadRecords();
-  }, []);
+ useEffect(() => {
+  loadRecords();
+  loadExtinguishers();
+}, []);
 
 
 const filteredRecords = records.filter((item) => {
@@ -337,7 +369,8 @@ const filteredRecords = records.filter((item) => {
     .join(" ")
     .toLowerCase();
 
-  const matchesSearch = !term || searchableText.includes(term);
+  const matchesSearch =
+    !term || searchableText.includes(term);
 
   const matchesLocation =
     !locationFilter ||
@@ -348,7 +381,31 @@ const filteredRecords = records.filter((item) => {
   const matchesResult =
     !resultFilter || item.result === resultFilter;
 
-  return matchesSearch && matchesLocation && matchesResult;
+  return (
+    matchesSearch &&
+    matchesLocation &&
+    matchesResult
+  );
+});
+
+const filteredExtinguishers = extinguishers.filter((item) => {
+  const term = searchTerm.trim().toLowerCase();
+
+  const searchableText = [
+    item.extinguisher_code,
+    item.location,
+    item.specific_site,
+    item.brand,
+    item.class,
+    item.type,
+    item.capacity,
+    item.status,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return !term || searchableText.includes(term);
 });
 
 
@@ -770,8 +827,9 @@ const filteredRecords = records.filter((item) => {
 
       <div className="flex items-center justify-between gap-3 flex-wrap text-sm text-neutral-600">
         <div>
-          Resultados: <b>{filteredRecords.length}</b> de{" "}
-          <b>{records.length}</b>
+Resultados: <b>{filteredExtinguishers.length}</b> de{" "}
+<b>{extinguishers.length}</b>          
+
         </div>
 
         <button
@@ -789,7 +847,7 @@ const filteredRecords = records.filter((item) => {
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {filteredRecords.map((item) => (
+      {filteredExtinguishers.map((item) => (
         <div
           key={item.id}
           className="border rounded-xl p-4 bg-white shadow-sm space-y-3"
@@ -822,11 +880,11 @@ const filteredRecords = records.filter((item) => {
           </div>
 
           <div className="text-sm">
-            <b>Ubicado en:</b> {item.located_at || "—"}
+            <b>Sitio específico:</b> {item.specific_site || "—"}
           </div>
 
           <div className="text-sm">
-            <b>Inspección:</b> {item.inspection_date || "—"}
+            <b>Estado:</b> {item.status || "—"}
           </div>
 
           <div className="text-sm">
@@ -837,21 +895,11 @@ const filteredRecords = records.filter((item) => {
             <b>Venc. P.H.:</b> {item.hydrostatic_expiry_date || "—"}
           </div>
 
-          <span
-            className={`inline-flex px-3 py-1 rounded-full text-xs font-bold ${
-              item.result === "NO CUMPLE"
-                ? "bg-red-700 text-white"
-                : "bg-green-700 text-white"
-            }`}
-          >
-            {item.result || "SIN RESULTADO"}
-          </span>
+         <span className="inline-flex px-3 py-1 rounded-full text-xs font-bold bg-green-700 text-white">
+  {item.status || "ACTIVE"}
+</span>
 
-          {item.observations && (
-            <div className="text-sm text-neutral-700">
-              <b>Obs:</b> {item.observations}
-            </div>
-          )}
+          
         </div>
       ))}
     </div>
