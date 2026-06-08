@@ -151,6 +151,7 @@ const [resultFilter, setResultFilter] = useState("");
 const [monthlyLocation, setMonthlyLocation] = useState("");
 const [monthlyDate, setMonthlyDate] = useState("");
 const [monthlyInspector, setMonthlyInspector] = useState("");
+const [monthlyUnit, setMonthlyUnit] = useState("");
 const [monthlyItems, setMonthlyItems] = useState<any[]>([]);
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -419,9 +420,18 @@ const filteredExtinguishers = extinguishers.filter((item) => {
   return !term || searchableText.includes(term);
 });
 
-function loadMonthlyItemsByLocation(location: string) {
+function loadMonthlyItemsByLocation(
+  location: string,
+  unit?: string
+) {
   const items = extinguishers
-    .filter((item) => item.location === location)
+    .filter((item) => {
+      if (location === "Well Services") {
+        return item.location === `Well Services - ${unit}`;
+      }
+
+      return item.location === location;
+    })
     .map((item) => ({
       ...item,
       cylinder_status: "B",
@@ -885,10 +895,18 @@ async function saveMonthlyInspection() {
     <select
       className="border p-2 rounded"
       value={monthlyLocation}
-      onChange={(e) => {
-        setMonthlyLocation(e.target.value);
-        loadMonthlyItemsByLocation(e.target.value);
-      }}
+onChange={(e) => {
+  const value = e.target.value;
+
+  setMonthlyLocation(value);
+  setMonthlyUnit("");
+  setMonthlyItems([]);
+
+  if (value !== "Well Services") {
+    loadMonthlyItemsByLocation(value);
+  }
+}}      
+
     >
       <option value="">Seleccione ubicación</option>
       <option value="Base Tocancipa">Base Tocancipa</option>
@@ -899,7 +917,34 @@ async function saveMonthlyInspection() {
       <option value="Otros">Otros</option>
     </select>
   </Field>
+{monthlyLocation === "Well Services" && (
+  <Field label="Unidad Well Services">
+    <select
+      className="border p-2 rounded"
+      value={monthlyUnit}
+      onChange={(e) => {
+        const unit = e.target.value;
 
+        setMonthlyUnit(unit);
+
+        loadMonthlyItemsByLocation(
+          "Well Services",
+          unit
+        );
+      }}
+    >
+      <option value="">
+        Seleccione unidad
+      </option>
+
+      {WELL_SERVICES_UNITS.map((unit) => (
+        <option key={unit} value={unit}>
+          {unit}
+        </option>
+      ))}
+    </select>
+  </Field>
+)}
   <Field label="Fecha de inspección">
     <input
       type="date"
