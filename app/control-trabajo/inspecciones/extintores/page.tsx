@@ -565,25 +565,26 @@ async function updateExtinguisher() {
     const photoUrl = await uploadPhoto();
 
     const payload = {
-      extinguisher_code: form.extinguisher_code,
-      location:
-        form.location === "Otros"
-          ? form.location_other
-          : form.location,
-      well_services_unit:
-        form.location === "Well Services"
-          ? form.well_services_unit
-          : "",
-      specific_site: form.located_at,
-      brand: form.brand,
-      class: form.class,
-      type: form.type,
-      capacity: form.capacity,
-      charge_expiry_date: form.charge_expiry_date,
-      hydrostatic_test_date: form.hydrostatic_test_date,
-      hydrostatic_expiry_date: form.hydrostatic_expiry_date,
-      photo_url: photoUrl || form.photo_url,
-    };
+  extinguisher_code: form.extinguisher_code,
+  location:
+    form.location === "Otros"
+      ? form.location_other
+      : form.location,
+  well_services_unit:
+    form.location === "Well Services"
+      ? form.well_services_unit
+      : "",
+  specific_site: form.located_at,
+  brand: form.brand,
+  class: form.class,
+  type: form.type,
+  capacity: form.capacity,
+  charge_expiry_date: form.charge_expiry_date,
+  hydrostatic_test_date: form.hydrostatic_test_date,
+  hydrostatic_expiry_date: form.hydrostatic_expiry_date,
+  status: form.result || "ACTIVE",
+  photo_url: photoUrl || form.photo_url,
+};
 
     const { error } = await supabase
       .from("fire_extinguishers")
@@ -1137,11 +1138,94 @@ for (const item of monthlyItems) {
         <input className="border p-2 rounded" value={form.capacity}
           onChange={(e) => updateField("capacity", e.target.value)} />
       </Field>
+<Field label="Vencimiento carga">
+  <input
+    type="month"
+    className="border p-2 rounded"
+    value={getMonthValueFromDate(form.charge_expiry_date)}
+    onChange={(e) =>
+      updateField("charge_expiry_date", getLastDayOfMonth(e.target.value))
+    }
+  />
+  {form.charge_expiry_date && (
+    <div className="text-xs text-neutral-500">
+      Se guardará como: {form.charge_expiry_date}
     </div>
+  )}
+</Field>
 
-    <button
-      type="button"
-      onClick={updateExtinguisher}
+<Field label="Fecha P.H.">
+  <input
+    type="month"
+    className="border p-2 rounded"
+    value={getMonthValueFromDate(form.hydrostatic_test_date)}
+    onChange={(e) => {
+      const monthValue = e.target.value;
+      updateField("hydrostatic_test_date", getLastDayOfMonth(monthValue));
+      updateField("hydrostatic_expiry_date", addFiveYearsToMonthEnd(monthValue));
+    }}
+  />
+</Field>
+
+<Field label="Vencimiento P.H.">
+  <input
+    type="date"
+    className="border p-2 rounded bg-neutral-50"
+    value={form.hydrostatic_expiry_date}
+    readOnly
+  />
+</Field>
+
+<Field label="Estado">
+  <select
+    className="border p-2 rounded"
+    value={form.result || "ACTIVE"}
+    onChange={(e) => updateField("result", e.target.value)}
+  >
+    <option value="ACTIVE">Activo</option>
+    <option value="OUT_OF_SERVICE">Fuera de servicio</option>
+    <option value="RETIRED">Retirado</option>
+  </select>
+</Field>
+  
+</div>
+
+<div className="border rounded p-4 space-y-3">
+  <div className="font-semibold">
+    Foto del extintor
+  </div>
+
+  {form.photo_url ? (
+    <img
+      src={form.photo_url}
+      alt={form.extinguisher_code}
+      className="h-40 w-full object-contain border rounded bg-neutral-50"
+    />
+  ) : (
+    <div className="h-40 border rounded bg-neutral-50 flex items-center justify-center text-sm text-neutral-500">
+      Sin foto actual
+    </div>
+  )}
+
+  <input
+    type="file"
+    accept="image/*"
+    capture="environment"
+    onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+    className="border p-2 rounded w-full"
+  />
+
+  {photoFile && (
+    <div className="text-sm text-green-700">
+      ✅ Nueva imagen seleccionada: {photoFile.name}
+    </div>
+  )}
+</div>
+
+<button
+  type="button"
+  onClick={updateExtinguisher}
+
       disabled={saving}
       className="w-full bg-black text-white py-3 rounded font-semibold disabled:opacity-50"
     >
