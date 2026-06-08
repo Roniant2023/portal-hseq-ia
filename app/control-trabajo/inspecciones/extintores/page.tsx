@@ -161,7 +161,9 @@ const [monthlyCodeSearch, setMonthlyCodeSearch] = useState("");
 const [monthlyItems, setMonthlyItems] = useState<any[]>([]);
 const [selectedExtinguisher, setSelectedExtinguisher] =
   useState<FireExtinguisher | null>(null);
-
+const [editPassword, setEditPassword] = useState("");
+const [pendingEditItem, setPendingEditItem] =
+  useState<FireExtinguisher | null>(null);
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -546,6 +548,27 @@ function openEditExtinguisher(item: FireExtinguisher) {
   setViewMode("editExtinguisher");
 }
 
+function requestEditExtinguisher(item: FireExtinguisher) {
+  setPendingEditItem(item);
+  setEditPassword("");
+  setUiError("");
+}
+
+function confirmEditPassword() {
+  if (editPassword !== "Estrella2026100%") {
+    setUiError("Clave incorrecta.");
+    return;
+  }
+
+  if (pendingEditItem) {
+    openEditExtinguisher(pendingEditItem);
+  }
+
+  setPendingEditItem(null);
+  setEditPassword("");
+  setUiError("");
+}
+
 async function updateExtinguisher() {
   try {
     setSaving(true);
@@ -732,6 +755,49 @@ for (const item of monthlyItems) {
             {uiError || uiInfo}
           </div>
         )}
+
+{pendingEditItem && (
+  <div className="border rounded-xl p-4 bg-yellow-50 space-y-3">
+    <div className="font-semibold">
+      Confirmar edición
+    </div>
+
+    <div className="text-sm text-neutral-700">
+      Digita la clave para editar el extintor{" "}
+      <b>{pendingEditItem.extinguisher_code}</b>.
+    </div>
+
+    <input
+      type="password"
+      className="border p-2 rounded w-full"
+      placeholder="Clave de edición"
+      value={editPassword}
+      onChange={(e) => setEditPassword(e.target.value)}
+    />
+
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={confirmEditPassword}
+        className="bg-black text-white rounded px-4 py-2 text-sm"
+      >
+        Confirmar
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          setPendingEditItem(null);
+          setEditPassword("");
+          setUiError("");
+        }}
+        className="border rounded px-4 py-2 text-sm bg-white"
+      >
+        Cancelar
+      </button>
+    </div>
+  </div>
+)}
 
 {viewMode === "menu" && (
   <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1643,7 +1709,7 @@ Resultados: <b>{filteredExtinguishers.length}</b> de{" "}
 
 <button
   type="button"
-  onClick={() => openEditExtinguisher(item)}
+  onClick={() => requestEditExtinguisher(item)}
   className="w-full border rounded px-3 py-2 text-sm font-medium"
 >
   Editar
