@@ -1054,7 +1054,10 @@ onChange={(e) => {
       value={monthlyInspector}
       onChange={(e) => setMonthlyInspector(e.target.value)}
     />
-  </Field>
+  
+</Field>
+</div>
+
 <div className="border rounded-xl p-4 bg-neutral-50 space-y-3">
   <div className="font-semibold">
     Buscar extintor por código
@@ -1080,7 +1083,6 @@ onChange={(e) => {
   <div className="text-xs text-neutral-500">
     Use este campo cuando el extintor encontrado no corresponde a la ubicación seleccionada.
   </div>
-</div>
 </div>
 
 <div className="text-sm text-neutral-600">
