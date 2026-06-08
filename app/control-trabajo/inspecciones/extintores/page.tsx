@@ -261,6 +261,7 @@ async function saveExtinguisher() {
     setUiInfo("✅ Extintor registrado correctamente.");
     setForm(emptyForm);
     setPhotoFile(null);
+await loadExtinguishers();
     setViewMode("list");
   } catch (err: any) {
     setUiError(err?.message || "Error registrando extintor.");
