@@ -522,11 +522,8 @@ function loadMonthlyItemByCode(code: string) {
     registered_well_services_unit:
       found.well_services_unit || "",
 
-    found_location: monthlyLocation || found.location,
-    found_well_services_unit:
-      monthlyLocation === "Well Services"
-        ? monthlyUnit
-        : "",
+    found_location: found.location,
+found_well_services_unit: found.well_services_unit || "",
 
     cylinder_status: "B",
     gauge_status: "B",
@@ -1359,52 +1356,7 @@ setUiInfo(
   </div>
 </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-  <Field label="Unidad Operativa / Departamento">
-    <select
-      className="border p-2 rounded"
-      value={monthlyLocation}
-
-onChange={(e) => {
-  const value = e.target.value;
-
-  setMonthlyLocation(value);
-  setMonthlyUnit("");
-  setMonthlyItems([]);
-}}  
-
-    >
-      <option value="">Seleccione ubicación</option>
-      <option value="Base Tocancipa">Base Tocancipa</option>
-      <option value="Base Palermo">Base Palermo</option>
-      <option value="Lote La Florida">Lote La Florida</option>
-      <option value="Well Services">Well Services</option>
-      <option value="Rig E2027">Rig E2027</option>
-      <option value="Otros">Otros</option>
-    </select>
-  </Field>
-{monthlyLocation === "Well Services" && (
-  <Field label="Unidad Well Services">
-    <select
-      className="border p-2 rounded"
-      value={monthlyUnit}
-      onChange={(e) => {
-  setMonthlyUnit(e.target.value);
-  setMonthlyItems([]);
-}}
-    >
-      <option value="">
-        Seleccione unidad
-      </option>
-
-      {WELL_SERVICES_UNITS.map((unit) => (
-        <option key={unit} value={unit}>
-          {unit}
-        </option>
-      ))}
-    </select>
-  </Field>
-)}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
   <Field label="Fecha de inspección">
     <input
       type="date"
@@ -1420,10 +1372,9 @@ onChange={(e) => {
       value={monthlyInspector}
       onChange={(e) => setMonthlyInspector(e.target.value)}
     />
+  </Field>
+</div>    
   
-</Field>
-</div>
-
 <div className="text-sm text-neutral-600">
   {monthlyItems.length > 0
     ? "Extintor listo para inspección"
