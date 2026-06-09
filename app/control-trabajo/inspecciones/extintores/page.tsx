@@ -518,12 +518,17 @@ function loadMonthlyItemByCode(code: string) {
   const itemToInspect = {
     ...found,
 
-    registered_location: found.location,
-    registered_well_services_unit:
-      found.well_services_unit || "",
+   registered_location: found.location,
+registered_well_services_unit:
+  found.well_services_unit || "",
+registered_specific_site:
+  found.specific_site || "",
 
-    found_location: found.location,
-found_well_services_unit: found.well_services_unit || "",
+found_location: found.location,
+found_well_services_unit:
+  found.well_services_unit || "",
+found_specific_site:
+  found.specific_site || "",
 
     cylinder_status: "B",
     gauge_status: "B",
@@ -685,12 +690,16 @@ async function saveMonthlyInspection() {
   extinguisher_code: item.extinguisher_code,
 
   registered_location: item.registered_location || item.location,
-  registered_well_services_unit:
-    item.registered_well_services_unit || "",
+registered_well_services_unit:
+  item.registered_well_services_unit || "",
+registered_specific_site:
+  item.registered_specific_site || item.specific_site || "",
 
-  found_location: item.found_location || item.location,
-  found_well_services_unit:
-    item.found_well_services_unit || "",
+found_location: item.found_location || item.location,
+found_well_services_unit:
+  item.found_well_services_unit || "",
+found_specific_site:
+  item.found_specific_site || "",
 
   cylinder_status: item.cylinder_status,
   gauge_status: item.gauge_status,
@@ -717,12 +726,13 @@ for (const item of monthlyItems) {
   await supabase
     .from("fire_extinguishers")
     .update({
-      location: item.found_location || item.location,
-      well_services_unit:
-        item.found_location === "Well Services"
-          ? item.found_well_services_unit || ""
-          : "",
-    })
+  location: item.found_location || item.location,
+  well_services_unit:
+    item.found_location === "Well Services"
+      ? item.found_well_services_unit || ""
+      : "",
+  specific_site: item.found_specific_site || "",
+})
     .eq("id", item.id);
 }
 
@@ -1406,9 +1416,14 @@ setUiInfo(
   </div>
 
   <div className="text-sm">
-    <b>Ubicación registrada:</b>{" "}
-    {item.registered_location || item.location || "—"}
-  </div>
+  <b>Ubicación registrada:</b>{" "}
+  {item.registered_location || item.location || "—"}
+</div>
+
+<div className="text-sm">
+  <b>Sitio específico registrado:</b>{" "}
+  {item.registered_specific_site || item.specific_site || "—"}
+</div>
 
   {item.registered_well_services_unit && (
     <div className="text-sm">
@@ -1445,6 +1460,22 @@ setUiInfo(
       <option value="Otros">Otros</option>
     </select>
   </Field>
+<Field label="Sitio específico encontrado">
+  <input
+    className="border p-2 rounded"
+    value={item.found_specific_site || ""}
+    onChange={(e) => {
+      const updated = [...monthlyItems];
+
+      updated[index] = {
+        ...updated[index],
+        found_specific_site: e.target.value,
+      };
+
+      setMonthlyItems(updated);
+    }}
+  />
+</Field>
 
   {item.found_location === "Well Services" && (
     <Field label="Unidad encontrada">
