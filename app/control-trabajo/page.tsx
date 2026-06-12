@@ -11,7 +11,7 @@ const tools = [
     title: "Tarjetas de Observación SOE",
     description:
       "Registro de observaciones HSEQ, evidencias y seguimiento.",
-    href: "https://soe-inteligente.vercel.app/soe",
+    href: "https://soe-inteligente.vercel.app",
   },
   {
     title: "Inspecciones HSEQ",
