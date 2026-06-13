@@ -5,15 +5,15 @@ const environmentalModules = [
     title: "Huella de Carbono",
     description:
       "Cálculo y seguimiento de emisiones de gases de efecto invernadero.",
-    icon: "/icons/ambiental.png",
+    icon: "/icons/huella-carbono.png",
     href: "https://huella-carbon-ia.vercel.app",
     external: true,
   },
   {
-    title: "Inspecciones Ambientales",
+    title: "Registro Fotográfico ICA",
     description:
-      "Inspecciones ambientales con evidencias fotográficas georreferenciadas.",
-    icon: "/icons/ambiental.png",
+      "Registro fotográfico georreferenciado para cumplimiento e informes ICA.",
+    icon: "/icons/registro-fotografico.png",
     href: "/ambiental/inspecciones",
     external: false,
   },
@@ -23,7 +23,6 @@ export default function AmbientalPage() {
   return (
     <main className="min-h-screen bg-white text-neutral-900">
       <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
-
         <header className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tight text-neutral-950">
@@ -55,7 +54,6 @@ export default function AmbientalPage() {
               className="group rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
             >
               <div className="flex min-h-[260px] flex-col items-center justify-center gap-6">
-
                 <Image
                   src={module.icon}
                   alt={module.title}
@@ -81,7 +79,6 @@ export default function AmbientalPage() {
             </a>
           ))}
         </section>
-
       </div>
     </main>
   );

@@ -18,6 +18,7 @@ type EvidenceItem = {
   latitude?: number | null;
   longitude?: number | null;
   capturedAt?: string | null;
+  comments?: string;
 };
 
 const initialEvidenceItems: EvidenceItem[] = [
@@ -27,6 +28,14 @@ const initialEvidenceItems: EvidenceItem[] = [
   { id: "punto_residuos", label: "Punto de residuos", required: true, checked: false },
   { id: "elementos_emergencia", label: "Elementos de emergencia", required: true, checked: false },
   { id: "diques_equipos", label: "Diques de equipos", required: true, checked: false },
+
+  {
+    id: "evidencia_adicional",
+    label: "Hallazgo / Evidencia adicional",
+    required: false,
+    checked: false,
+    comments: "",
+  },
 ];
 
 export default function AmbientalInspeccionesPage() {
@@ -82,6 +91,19 @@ export default function AmbientalInspeccionesPage() {
     );
   };
 
+const handleCommentChange = (itemId: string, value: string) => {
+  setItems((prev) =>
+    prev.map((item) =>
+      item.id === itemId
+        ? {
+            ...item,
+            comments: value,
+          }
+        : item
+    )
+  );
+};
+
   const handleSave = async () => {
     setMessage("");
 
@@ -90,12 +112,21 @@ export default function AmbientalInspeccionesPage() {
       return;
     }
 
-    const missingPhotos = items.filter((item) => !item.photo);
+    const missingPhotos = items.filter((item) => item.required && !item.photo);
 
     if (missingPhotos.length > 0) {
       setMessage("Debe cargar todas las evidencias fotográficas obligatorias.");
       return;
     }
+
+const additionalEvidence = items.find(
+  (item) => item.id === "evidencia_adicional"
+);
+
+if (additionalEvidence?.photo && !additionalEvidence.comments?.trim()) {
+  setMessage("Debe escribir un comentario para la evidencia adicional.");
+  return;
+}
 
     setSaving(true);
 
@@ -142,6 +173,7 @@ export default function AmbientalInspeccionesPage() {
             latitude: item.latitude,
             longitude: item.longitude,
             captured_at: item.capturedAt,
+comments: item.comments || null,
           });
 
         if (photoError) throw photoError;
@@ -307,6 +339,21 @@ export default function AmbientalInspeccionesPage() {
                   }
                   className="mt-3 block w-full rounded border border-black px-3 py-2 text-sm"
                 />
+
+{item.id === "evidencia_adicional" && item.photo && (
+  <div className="mt-3">
+    <label className="mb-1 block text-xs text-gray-600">
+      Comentario del hallazgo
+    </label>
+
+    <textarea
+      value={item.comments || ""}
+      onChange={(e) => handleCommentChange(item.id, e.target.value)}
+      placeholder="Describa el hallazgo o la evidencia adicional"
+      className="min-h-24 w-full rounded border border-black px-3 py-2 text-sm"
+    />
+  </div>
+)}
 
                 {item.photo && (
                   <div className="mt-3 grid gap-1 rounded border border-gray-300 bg-gray-50 p-3 text-xs text-gray-700 md:grid-cols-2">
