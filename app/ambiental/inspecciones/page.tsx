@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { createClient } from "@supabase/supabase-js";
-
+import Link from "next/link";
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
@@ -202,25 +202,34 @@ comments: item.comments || null,
     <main className="min-h-screen bg-white px-4 py-8 text-black">
       <div className="mx-auto max-w-5xl">
         <header className="mb-10 flex items-start justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Inspecciones Ambientales
-            </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Registro de evidencias fotográficas georreferenciadas
-            </p>
-          </div>
+  <div>
+    <h1 className="text-3xl font-bold tracking-tight">
+      Registro Fotográfico ICA
+    </h1>
+    <p className="mt-1 text-sm text-gray-600">
+      Registro fotográfico georreferenciado para informes de cumplimiento ambiental e ICA.
+    </p>
 
-          <div className="relative h-16 w-52">
-            <Image
-              src="/logo-eies.png"
-              alt="Estrella International Energy Services"
-              fill
-              className="object-contain"
-              priority
-            />
-          </div>
-        </header>
+    <div className="mt-4">
+      <Link
+        href="/ambiental/inspecciones/listado"
+        className="inline-block rounded bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800"
+      >
+        Consultar registros
+      </Link>
+    </div>
+  </div>
+
+  <div className="relative h-16 w-52">
+    <Image
+      src="/logo-eies.png"
+      alt="Estrella International Energy Services"
+      fill
+      className="object-contain"
+      priority
+    />
+  </div>
+</header>
 
         <section className="mb-6 rounded border border-black p-4">
           <h2 className="mb-4 text-base font-semibold">Datos generales</h2>
