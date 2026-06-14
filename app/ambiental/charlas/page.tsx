@@ -2,18 +2,20 @@ import Image from "next/image";
 import Link from "next/link";
 
 const modules = [
- {
-  title: "Biblioteca de charlas",
-  description: "Crear charlas maestras, cargar flyer y contenido guía.",
-  icon: "/icons/charlas-hseq.png",
-  href: "/ambiental/charlas/biblioteca",
-},
-{
-  title: "Ejecutar charlas",
-  description: "Ver charlas programadas, consultar el material y registrar ejecución.",
-  icon: "/icons/charlas-hseq.png",
-  href: "/ambiental/charlas/ejecutar",
-},
+  {
+    title: "Gestión de charlas",
+    description:
+      "Administrar biblioteca, preguntas y programación mensual.",
+    icon: "/icons/charlas-hseq.png",
+    href: "/ambiental/charlas/gestion",
+  },
+  {
+    title: "Ejecutar charlas",
+    description:
+      "Consultar charlas programadas, visualizar material y registrar ejecución en campo.",
+    icon: "/icons/charlas-hseq.png",
+    href: "/ambiental/charlas/ejecutar",
+  },
 ];
 
 export default function CharlasHSEQPage() {

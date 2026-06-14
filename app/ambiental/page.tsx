@@ -18,7 +18,7 @@ const environmentalModules = [
     external: false,
   },
 {
-  title: "Charlas HSEQ",
+  title: "Charlas HSEQ ICA",
   description:
     "Programación, cuestionarios, asistencia QR y actas de charlas ambientales y de seguridad.",
   icon: "/icons/charlas-hseq.png",
