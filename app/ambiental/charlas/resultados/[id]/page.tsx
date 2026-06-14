@@ -74,6 +74,14 @@ export default function DetalleResultadoPage() {
           Detalle de ejecución
         </h1>
 
+<button
+  type="button"
+  onClick={() => window.print()}
+  className="no-print mt-4 rounded bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+>
+  Generar PDF
+</button>
+
         <div className="mt-8 rounded border border-black p-5">
           <h2 className="text-2xl font-bold">
             {
@@ -128,6 +136,7 @@ export default function DetalleResultadoPage() {
                   <th className="p-2 text-left">Cargo</th>
                   <th className="p-2 text-left">Empresa</th>
                   <th className="p-2 text-left">Resultado</th>
+<th className="p-2 text-left">Firma</th>
                 </tr>
               </thead>
 
@@ -153,6 +162,17 @@ export default function DetalleResultadoPage() {
                     <td className="p-2 font-semibold">
                       {person.score ?? "-"}%
                     </td>
+<td className="p-2">
+  {person.signature_url ? (
+    <img
+      src={person.signature_url}
+      alt="Firma"
+      className="h-16 max-w-[160px] rounded border object-contain"
+    />
+  ) : (
+    "Sin firma"
+  )}
+</td>
                   </tr>
                 ))}
               </tbody>
@@ -160,7 +180,32 @@ export default function DetalleResultadoPage() {
           </div>
         </section>
 
-      </div>
+     </div>
+
+      <style jsx global>{`
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+
+          body {
+            background: white;
+          }
+
+          main {
+            padding: 20px !important;
+          }
+
+          table {
+            page-break-inside: auto;
+          }
+
+          tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+          }
+        }
+      `}</style>
     </main>
   );
 }
