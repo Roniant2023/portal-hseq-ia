@@ -84,7 +84,11 @@ const [executionId, setExecutionId] = useState("");
 
 const handleFinishTalk = async () => {
   setMessage("");
-
+if (saving) return;
+if (executionId) {
+  setMessage("Esta ejecución ya fue registrada. Use el QR generado para asistencia.");
+  return;
+}
   if (!responsible.trim() || !location.trim() || !evidencePhoto) {
     setMessage("Debe diligenciar responsable, ubicación y foto evidencia.");
     return;
@@ -319,10 +323,10 @@ setExecutionId(executionData.id);
   <button
     type="button"
     onClick={handleFinishTalk}
-    disabled={saving}
+    disabled={saving || !!executionId}
     className="rounded bg-green-700 px-5 py-3 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
   >
-    {saving ? "Finalizando..." : "Finalizar charla"}
+    {saving ? "Finalizando..." : executionId ? "Charla finalizada" : "Finalizar charla"}
   </button>
 </div>
       </div>

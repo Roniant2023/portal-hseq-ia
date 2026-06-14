@@ -183,6 +183,65 @@ export default function AsistenciaCharlaPage() {
     setSaving(true);
 
     try {
+const { data: currentExecution, error: currentExecutionError } = await supabase
+  .from("hseq_talk_executions")
+  .select(`
+    id,
+    hseq_monthly_schedule (
+      year,
+      month,
+      talk_library_id
+    )
+  `)
+  .eq("id", executionId)
+  .single();
+
+if (currentExecutionError) throw currentExecutionError;
+
+const schedule = Array.isArray(currentExecution.hseq_monthly_schedule)
+  ? currentExecution.hseq_monthly_schedule[0]
+  : currentExecution.hseq_monthly_schedule;
+
+const { data: existingAttendance, error: existingAttendanceError } =
+  await supabase
+    .from("hseq_talk_attendance")
+    .select(`
+      id,
+      hseq_talk_executions (
+        hseq_monthly_schedule (
+          year,
+          month,
+          talk_library_id
+        )
+      )
+    `)
+    .eq("participant_id", participantId.trim());
+
+if (existingAttendanceError) throw existingAttendanceError;
+
+const alreadyRegistered = (existingAttendance || []).some((item: any) => {
+  const execution = Array.isArray(item.hseq_talk_executions)
+    ? item.hseq_talk_executions[0]
+    : item.hseq_talk_executions;
+
+  const registeredSchedule = Array.isArray(execution?.hseq_monthly_schedule)
+    ? execution.hseq_monthly_schedule[0]
+    : execution?.hseq_monthly_schedule;
+
+  return (
+    registeredSchedule?.year === schedule?.year &&
+    registeredSchedule?.month === schedule?.month &&
+    registeredSchedule?.talk_library_id === schedule?.talk_library_id
+  );
+});
+
+if (alreadyRegistered) {
+  setMessage(
+    "Esta cédula ya registra participación en esta charla durante el mes actual."
+  );
+  setSaving(false);
+  return;
+}
       const signatureFile = await canvasToFile();
 
       if (!signatureFile) {
