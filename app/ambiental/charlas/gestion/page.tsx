@@ -25,8 +25,13 @@ const modules = [
       "Programar las charlas semanales de cada mes.",
     href: "/ambiental/charlas/programacion",
   },
+  {
+    title: "Resultados",
+    description:
+      "Consultar ejecuciones, asistentes y resultados por ubicación.",
+    href: "/ambiental/charlas/resultados",
+  },
 ];
-
 export default function GestionCharlasPage() {
   const [password, setPassword] = useState("");
   const [authorized, setAuthorized] = useState(false);
@@ -122,7 +127,7 @@ else {
             </button>
           </section>
         ) : (
-          <section className="grid gap-6 md:grid-cols-3">
+          <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             {modules.map((module) => (
               <Link
                 key={module.title}
