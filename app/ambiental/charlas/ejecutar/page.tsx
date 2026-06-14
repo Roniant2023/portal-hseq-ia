@@ -15,6 +15,7 @@ type ScheduledTalk = {
   month: number;
   week_number: number;
   status: string;
+
   hseq_talk_library: {
     id: string;
     title: string;
@@ -25,6 +26,13 @@ type ScheduledTalk = {
     key_points: string;
     final_message: string;
   } | null;
+
+  hseq_talk_executions?: {
+    id: string;
+    location: string;
+    responsible: string;
+    created_at: string;
+  }[];
 };
 
 export default function EjecutarCharlaPage() {
@@ -42,23 +50,30 @@ export default function EjecutarCharlaPage() {
   const loadScheduledTalks = async () => {
     const { data, error } = await supabase
       .from("hseq_monthly_schedule")
-      .select(`
-        id,
-        year,
-        month,
-        week_number,
-        status,
-        hseq_talk_library (
-          id,
-          title,
-          category,
-          objective,
-          duration_minutes,
-          guide_content,
-          key_points,
-          final_message
-        )
-      `)
+      
+.select(`
+  id,
+  year,
+  month,
+  week_number,
+  status,
+  hseq_talk_library (
+    id,
+    title,
+    category,
+    objective,
+    duration_minutes,
+    guide_content,
+    key_points,
+    final_message
+  ),
+  hseq_talk_executions (
+    id,
+    location,
+    responsible,
+    created_at
+  )
+`)
       .eq("year", currentYear)
       .eq("month", currentMonth)
       .order("week_number", { ascending: true });
@@ -67,12 +82,15 @@ export default function EjecutarCharlaPage() {
   console.error(error);
 } else {
   const normalizedData = (data || []).map((item: any) => ({
-    ...item,
-    hseq_talk_library: Array.isArray(item.hseq_talk_library)
-      ? item.hseq_talk_library[0] || null
-      : item.hseq_talk_library,
-  }));
+  ...item,
+  hseq_talk_library: Array.isArray(item.hseq_talk_library)
+    ? item.hseq_talk_library[0] || null
+    : item.hseq_talk_library,
 
+  hseq_talk_executions: Array.isArray(item.hseq_talk_executions)
+    ? item.hseq_talk_executions
+    : [],
+}));
   setTalks(normalizedData as ScheduledTalk[]);
 }
     setLoading(false);
@@ -112,10 +130,47 @@ export default function EjecutarCharlaPage() {
                     </p>
                   </div>
 
-                  <span className="rounded bg-green-700 px-3 py-1 text-xs font-semibold text-white">
-                    {talk.status}
-                  </span>
+                 <div className="flex flex-wrap gap-2">
+  <span className="rounded bg-green-700 px-3 py-1 text-xs font-semibold text-white">
+    {talk.status}
+  </span>
+
+  <span className="rounded bg-black px-3 py-1 text-xs font-semibold text-white">
+    {talk.hseq_talk_executions?.length || 0} ejecuciones
+  </span>
+</div>
                 </div>
+
+{talk.hseq_talk_executions &&
+  talk.hseq_talk_executions.length > 0 && (
+    <div className="mt-4 rounded border border-gray-300 bg-gray-50 p-4">
+      <h3 className="font-semibold">Ejecuciones registradas</h3>
+
+      <div className="mt-3 grid gap-2">
+        {talk.hseq_talk_executions.map((execution) => (
+          <div
+            key={execution.id}
+            className="rounded border border-gray-300 bg-white p-3 text-sm"
+          >
+            <p>
+              <strong>Ubicación:</strong> {execution.location || "Sin ubicación"}
+            </p>
+            <p>
+              <strong>Responsable:</strong>{" "}
+              {execution.responsible || "Sin responsable"}
+            </p>
+            <p className="text-xs text-gray-500">
+              {execution.created_at
+                ? new Date(execution.created_at).toLocaleString("es-CO")
+                : ""}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+
 
                 <div className="mt-4 rounded border border-gray-300 bg-gray-50 p-4">
                   <h3 className="font-semibold">Objetivo</h3>

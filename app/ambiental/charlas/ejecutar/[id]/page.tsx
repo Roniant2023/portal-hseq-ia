@@ -125,10 +125,7 @@ const handleFinishTalk = async () => {
 
     if (executionError) throw executionError;
 setExecutionId(executionData.id);
-    await supabase
-      .from("hseq_monthly_schedule")
-      .update({ status: "ejecutada" })
-      .eq("id", id);
+   
 
     setMessage("Charla finalizada y registrada exitosamente.");
   } catch (error: any) {
