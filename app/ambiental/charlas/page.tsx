@@ -3,16 +3,16 @@ import Link from "next/link";
 
 const modules = [
  {
-  title: "Programar charla",
-  description: "Programar una charla HSEQ y cargar su cuestionario.",
+  title: "Biblioteca de charlas",
+  description: "Crear charlas maestras, cargar flyer y contenido guía.",
   icon: "/icons/charlas-hseq.png",
-  href: "/ambiental/charlas/crear",
+  href: "/ambiental/charlas/biblioteca",
 },
 {
-  title: "Gestión de charlas",
-  description: "Consultar charlas programadas, ejecutadas y participantes.",
+  title: "Ejecutar charlas",
+  description: "Ver charlas programadas, consultar el material y registrar ejecución.",
   icon: "/icons/charlas-hseq.png",
-  href: "/ambiental/charlas/listado",
+  href: "/ambiental/charlas/ejecutar",
 },
 ];
 
