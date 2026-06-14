@@ -17,6 +17,14 @@ const environmentalModules = [
     href: "/ambiental/inspecciones",
     external: false,
   },
+{
+  title: "Charlas HSEQ",
+  description:
+    "Programación, cuestionarios, asistencia QR y actas de charlas ambientales y de seguridad.",
+  icon: "/icons/charlas-hseq.png",
+  href: "/ambiental/charlas",
+  external: false,
+},
 ];
 
 export default function AmbientalPage() {
