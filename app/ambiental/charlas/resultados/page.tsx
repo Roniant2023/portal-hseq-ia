@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -145,6 +146,7 @@ export default function ResultadosCharlasPage() {
                   <th className="p-3 text-left">Asistentes</th>
                   <th className="p-3 text-left">Promedio</th>
                   <th className="p-3 text-left">Estado</th>
+<th className="p-3 text-left">Acción</th>
                 </tr>
               </thead>
 
@@ -168,8 +170,13 @@ export default function ResultadosCharlasPage() {
                   return (
                     <tr key={execution.id} className="border-t">
                       <td className="p-3">
-                        {execution.executed_date}
-                      </td>
+  <Link
+    href={`/ambiental/charlas/resultados/${execution.id}`}
+    className="rounded bg-black px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800"
+  >
+    Ver detalle
+  </Link>
+</td>
 
                       <td className="p-3 font-semibold">
                         {
