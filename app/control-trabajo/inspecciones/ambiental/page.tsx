@@ -143,6 +143,8 @@ const [openSections, setOpenSections] = useState({
 
 });
 const [activeSection, setActiveSection] = useState("orderCleanliness");
+const [reviewedSections, setReviewedSections] = useState<string[]>([]);
+
 function toggleSection(section: keyof typeof openSections) {
   setOpenSections((prev) => ({
     ...prev,
@@ -161,6 +163,8 @@ const inspectionSections = [
   { id: "waterTreatment", label: "PTAR / Agua" },
   { id: "hydraulicNetwork", label: "Red hidráulica" },
 ];
+const allSectionsReviewed =
+  reviewedSections.length === inspectionSections.length;
 const [form, setForm] = useState({
   inspection_date: "",
   inspector_name: "",
@@ -245,8 +249,9 @@ function getSectionStatus(section: string) {
     !serialized.includes('"observation":""');
 
   if (hasFinding) return "finding";
-  if (hasObservation) return "progress";
-  return "pending";
+if (reviewedSections.includes(section)) return "completed";
+if (hasObservation) return "progress";
+return "pending";
 }
 function updateField(key: string, value: any) {
   setForm((prev) => ({
@@ -570,13 +575,15 @@ useEffect(() => {
       const status = getSectionStatus(section.id);
 
       const colorClass =
-        status === "finding"
-          ? "bg-red-600 text-white border-red-700"
-          : status === "progress"
+     status === "finding"
+  ? "bg-red-600 text-white border-red-700"
+  : status === "completed"
+  ? "bg-green-700 text-white border-green-800"
+  : status === "progress"
           ? "bg-yellow-400 text-black border-yellow-500"
-          : activeSection === section.id
-          ? "bg-green-700 text-white border-green-800"
-          : "bg-white text-black border-neutral-300";
+         : activeSection === section.id
+? "bg-blue-700 text-white border-blue-800"
+: "bg-white text-black border-neutral-300";
 
       return (
         <button
@@ -588,13 +595,15 @@ useEffect(() => {
           {section.label}
 
           <div className="mt-1 text-xs font-normal">
-            {status === "finding"
-              ? "Con hallazgos"
-              : status === "progress"
-              ? "En proceso"
-              : activeSection === section.id
-              ? "Seleccionado"
-              : "No iniciado"}
+           {status === "finding"
+  ? "Con hallazgos"
+  : status === "completed"
+  ? "Revisado"
+  : status === "progress"
+  ? "En proceso"
+  : activeSection === section.id
+  ? "Seleccionado"
+  : "No iniciado"}
           </div>
         </button>
       );
@@ -646,7 +655,24 @@ useEffect(() => {
         }}
       />
     </div>
-  ))}
+ ))}
+
+  <button
+  type="button"
+  onClick={() => {
+    if (!reviewedSections.includes("orderCleanliness")) {
+      setReviewedSections((prev) => [
+        ...prev,
+        "orderCleanliness",
+      ]);
+    }
+
+    setActiveSection("environmentalKit");
+  }}
+  className="bg-green-700 text-white px-4 py-2 rounded"
+>
+  ✓ Marcar módulo revisado
+</button>
 </div>
 )}
 {activeSection === "environmentalKit" && (
@@ -724,6 +750,23 @@ useEffect(() => {
       </div>
     </div>
   ))}
+
+<button
+  type="button"
+  onClick={() => {
+    if (!reviewedSections.includes("environmentalKit")) {
+      setReviewedSections((prev) => [
+        ...prev,
+        "environmentalKit",
+      ]);
+    }
+
+    setActiveSection("ecologicalPoint");
+  }}
+  className="bg-green-700 text-white px-4 py-2 rounded"
+>
+  ✓ Marcar módulo revisado
+</button>
 </div>
 )}
 {activeSection === "ecologicalPoint" && (
@@ -777,6 +820,22 @@ useEffect(() => {
       />
     </div>
   ))}
+<button
+  type="button"
+  onClick={() => {
+    if (!reviewedSections.includes("ecologicalPoint")) {
+      setReviewedSections((prev) => [
+        ...prev,
+        "ecologicalPoint",
+      ]);
+    }
+
+    setActiveSection("chemicalStorage");
+  }}
+  className="bg-green-700 text-white px-4 py-2 rounded"
+>
+  ✓ Marcar módulo revisado
+</button>
 </div>
 )}
 {activeSection === "chemicalStorage" && (
@@ -828,6 +887,22 @@ useEffect(() => {
       />
     </div>
   ))}
+<button
+  type="button"
+  onClick={() => {
+    if (!reviewedSections.includes("chemicalStorage")) {
+      setReviewedSections((prev) => [
+        ...prev,
+        "chemicalStorage",
+      ]);
+    }
+
+    setActiveSection("bathrooms");
+  }}
+  className="bg-green-700 text-white px-4 py-2 rounded"
+>
+  ✓ Marcar módulo revisado
+</button>
 </div>
 )}
 {activeSection === "bathrooms" && (
@@ -894,6 +969,22 @@ useEffect(() => {
       ))}
     </div>
   ))}
+<button
+  type="button"
+  onClick={() => {
+    if (!reviewedSections.includes("bathrooms")) {
+      setReviewedSections((prev) => [
+        ...prev,
+        "bathrooms",
+      ]);
+    }
+
+    setActiveSection("waterTreatment");
+  }}
+  className="bg-green-700 text-white px-4 py-2 rounded"
+>
+  ✓ Marcar módulo revisado
+</button>
 </div>
 )}
 {activeSection === "waterTreatment" && (
@@ -947,6 +1038,22 @@ useEffect(() => {
       />
     </div>
   ))}
+<button
+  type="button"
+  onClick={() => {
+    if (!reviewedSections.includes("waterTreatment")) {
+      setReviewedSections((prev) => [
+        ...prev,
+        "waterTreatment",
+      ]);
+    }
+
+    setActiveSection("hydraulicNetwork");
+  }}
+  className="bg-green-700 text-white px-4 py-2 rounded"
+>
+  ✓ Marcar módulo revisado
+</button>
 </div>
 )}
 {activeSection === "hydraulicNetwork" && (
@@ -998,16 +1105,36 @@ useEffect(() => {
       />
     </div>
   ))}
-</div>
-)}
 <button
   type="button"
-  onClick={saveInspection}
-  disabled={saving}
-  className="w-full bg-green-700 text-white py-3 rounded font-semibold disabled:opacity-50"
+  onClick={() => {
+    if (!reviewedSections.includes("hydraulicNetwork")) {
+      setReviewedSections((prev) => [
+        ...prev,
+        "hydraulicNetwork",
+      ]);
+    }
+  }}
+  className="bg-green-700 text-white px-4 py-2 rounded"
 >
-  {saving ? "Guardando..." : "Guardar inspección ambiental"}
+  ✓ Finalizar inspección
 </button>
+</div>
+)}
+{allSectionsReviewed ? (
+  <button
+    type="button"
+    onClick={saveInspection}
+    disabled={saving}
+    className="w-full bg-green-700 text-white py-3 rounded font-semibold disabled:opacity-50"
+  >
+    {saving ? "Guardando..." : "Guardar inspección ambiental"}
+  </button>
+) : (
+  <div className="border border-yellow-300 bg-yellow-50 text-yellow-800 rounded p-3 text-sm">
+    Debes revisar y finalizar todos los módulos antes de guardar la inspección.
+  </div>
+)}
 
 {uiInfo && (
   <div className="border rounded p-3 bg-green-50 border-green-200 text-green-800 text-sm">
