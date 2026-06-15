@@ -9,6 +9,14 @@ const environmentalModules = [
     href: "https://huella-carbon-ia.vercel.app",
     external: true,
   },
+{
+  title: "Inspección Ambiental",
+  description:
+    "Registro, seguimiento y generación de reportes de inspecciones ambientales.",
+  icon: "/icons/inspeccion-ambiental.png",
+  href: "/control-trabajo/inspecciones/ambiental",
+  external: false,
+},
   {
     title: "Registro Fotográfico ICA",
     description:

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import SignaturePadField from "../../../components/SignaturePadField";
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
-type ViewMode = "menu" | "new" | "list";
+type ViewMode = "menu" | "new" | "list" | "detail";
 
 const ORDER_CLEANLINESS_ITEMS = [
   "¿Los pisos, vías peatonales, pasillos, entradas y salidas se encuentran libres de obstáculos y basura?",
@@ -81,6 +82,7 @@ const CHEMICAL_STORAGE_ITEMS = [
 ];
 
 const BATHROOM_ITEMS = [
+  "BAÑOS DE MUJERES",
   "BAÑOS DE HOMBRES",
   "OFICINAS ADMINISTRATIVAS",
 ];
@@ -132,6 +134,7 @@ const [saving, setSaving] = useState(false);
 const [uiInfo, setUiInfo] = useState("");
 const [uiError, setUiError] = useState("");
 const [records, setRecords] = useState<any[]>([]);
+const [selectedRecord, setSelectedRecord] = useState<any>(null);
 const [openSections, setOpenSections] = useState({
   orderCleanliness: true,
   environmentalKit: false,
@@ -172,6 +175,8 @@ const [form, setForm] = useState({
   location: "",
   specific_site: "",
   location_other: "",
+signature_url: "",
+
 
   order_cleanliness: ORDER_CLEANLINESS_ITEMS.map((question) => ({
     question,
@@ -461,6 +466,7 @@ async function saveInspection() {
         form.location === "Otros" ? form.location_other : form.location,
       location_other: form.location_other,
       specific_site: form.specific_site,
+signature_url: form.signature_url,
 
       order_cleanliness: form.order_cleanliness,
       environmental_kit: form.environmental_kit,
@@ -485,6 +491,7 @@ async function saveInspection() {
     }
 
     setUiInfo("✅ Inspección ambiental guardada correctamente.");
+await loadRecords();
     setViewMode("list");
   } catch (err: any) {
     setUiError(err?.message || "Error guardando inspección ambiental.");
@@ -660,7 +667,7 @@ useEffect(() => {
   }
 />
 
-    {form.location === "Otros" && (
+   {form.location === "Otros" && (
       <input
         className="border p-2 rounded w-full mt-2"
         placeholder="Especifique ubicación"
@@ -672,9 +679,20 @@ useEffect(() => {
     )}
   </div>
 
+  <div className="md:col-span-3 mt-4">
+    <SignaturePadField
+      label="Firma del inspector"
+      value={form.signature_url}
+      onChange={(dataUrl) =>
+        updateField("signature_url", dataUrl)
+      }
+    />
+  </div>
+
 </div>            
 
 <div className="border rounded-xl p-4 bg-neutral-50">
+
   <div className="font-bold text-lg mb-3">
     Módulos de inspección
   </div>
@@ -1307,6 +1325,452 @@ useEffect(() => {
           </section>
         )}
 
+{viewMode === "detail" && selectedRecord && (
+  <section className="border rounded-xl p-6 bg-white shadow-sm space-y-4">
+    <div className="flex justify-between gap-3">
+      <button
+        type="button"
+        onClick={() => setViewMode("list")}
+        className="border rounded px-4 py-2 no-print"
+      >
+        ← Volver al listado
+      </button>
+
+      <button
+        type="button"
+        onClick={() => window.print()}
+        className="bg-black text-white rounded px-4 py-2 no-print"
+      >
+        Generar PDF
+      </button>
+    </div>
+
+    <h2 className="text-2xl font-bold">
+      Reporte de inspección ambiental
+    </h2>
+<div className="border-2 border-black mb-4 text-[10px] leading-tight">
+  
+
+  <div className="grid grid-cols-12 border-b">
+  <div className="col-span-8">
+
+    <div className="grid grid-cols-2 border-b">
+      <div className="border-r p-1 font-semibold">
+        Título del sistema:
+      </div>
+      <div className="p-1">
+        Gestión HSSEQ
+      </div>
+    </div>
+
+    <div className="grid grid-cols-2 border-b">
+      <div className="border-r p-1 font-semibold">
+        Nombre del formato:
+      </div>
+      <div className="p-1">
+        Inspección Ambiental
+      </div>
+    </div>
+
+    <div className="grid grid-cols-2">
+      <div className="border-r p-1 font-semibold">
+        No. de formato:
+      </div>
+      <div className="p-1">
+        02-02-100 F 002
+      </div>
+    </div>
+
+  </div>
+    <div className="col-span-4 flex items-center justify-center border-l p-1">
+      <img
+        src="/logo-eies.png"
+        alt="Estrella"
+        className="max-h-10 object-contain"
+      />
+    </div>
+  </div>
+
+  <div className="grid grid-cols-5">
+    <div className="border-r p-1">
+     <div className="font-semibold">
+        Fecha de emisión
+      </div>
+      <div>13/01/2025</div>
+    </div>
+
+    <div className="border-r p-1">
+      <div className="font-semibold">
+        No. Revisión
+      </div>
+      <div>1</div>
+    </div>
+
+    <div className="border-r p-1">
+      <div className="font-semibold">
+        Preparado por
+      </div>
+      <div>HSSEQ</div>
+    </div>
+
+    <div className="border-r p-1">
+     <div className="font-semibold">
+        Aprobado por
+      </div>
+      <div>JMC</div>
+    </div>
+
+    <div className="p-1">
+      <div className="font-semibold">
+        Página
+      </div>
+      <div>1 de 1</div>
+    </div>
+  </div>
+</div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+      <div><strong>Fecha:</strong> {selectedRecord.inspection_date}</div>
+      <div><strong>Inspector:</strong> {selectedRecord.inspector_name}</div>
+      <div><strong>Operadora:</strong> {selectedRecord.operator}</div>
+      <div><strong>Ubicación:</strong> {selectedRecord.location}</div>
+      <div><strong>Sitio específico:</strong> {selectedRecord.specific_site}</div>
+      <div><strong>Resultado:</strong> {selectedRecord.result}</div>
+    </div>
+<div className="mt-8">
+  <h3 className="text-lg font-bold mb-4">
+    1. Orden y Aseo
+  </h3>
+
+  <div className="overflow-x-auto">
+    <table className="w-full border text-sm">
+      <thead>
+        <tr className="bg-neutral-100">
+          <th className="border p-2 text-left">Ítem</th>
+          <th className="border p-2 text-center w-20">C</th>
+          <th className="border p-2 text-center w-20">NC</th>
+          <th className="border p-2 text-center w-20">N/A</th>
+          <th className="border p-2 text-left">Observación</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {selectedRecord.order_cleanliness?.map((item: any, index: number) => (
+          <tr key={index}>
+            <td className="border p-2">{item.question}</td>
+            <td className="border p-2 text-center">{item.answer === "CUMPLE" ? "☑" : "☐"}</td>
+            <td className="border p-2 text-center">{item.answer === "NO CUMPLE" ? "☑" : "☐"}</td>
+            <td className="border p-2 text-center">{item.answer === "NA" ? "☑" : "☐"}</td>
+            <td className="border p-2">{item.observation || "-"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div className="mt-8">
+  <h3 className="text-lg font-bold mb-4">
+    2. Kit Ambiental
+  </h3>
+
+  <div className="overflow-x-auto">
+    <table className="w-full border text-sm">
+      <thead>
+        <tr className="bg-neutral-100">
+          <th className="border p-2 text-left">Elemento</th>
+          <th className="border p-2 text-center">Disponible</th>
+          <th className="border p-2 text-center">No disponible</th>
+          <th className="border p-2 text-center">Bueno</th>
+          <th className="border p-2 text-center">Malo</th>
+          <th className="border p-2 text-center">Reemplazar</th>
+          <th className="border p-2 text-center">Cantidad</th>
+          <th className="border p-2 text-left">Observación</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {selectedRecord.environmental_kit?.map(
+          (item: any, index: number) => (
+            <tr key={index}>
+              <td className="border p-2">
+                {item.item}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.available === "SI" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.available === "NO" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.status === "B" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.status === "M" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.status === "RC" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.quantity || "-"}
+              </td>
+
+              <td className="border p-2">
+                {item.observation || "-"}
+              </td>
+            </tr>
+          )
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div className="mt-8">
+  <h3 className="text-lg font-bold mb-4">
+    3. Punto Ecológico
+  </h3>
+
+  <div className="overflow-x-auto">
+    <table className="w-full border text-sm">
+      <thead>
+        <tr className="bg-neutral-100">
+          <th className="border p-2 text-left">Ítem</th>
+          <th className="border p-2 text-center w-20">C</th>
+          <th className="border p-2 text-center w-20">NC</th>
+          <th className="border p-2 text-center w-20">N/A</th>
+          <th className="border p-2 text-left">Observación</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {selectedRecord.ecological_point?.map((item: any, index: number) => (
+          <tr key={index}>
+            <td className="border p-2">{item.item}</td>
+            <td className="border p-2 text-center">{item.answer === "CUMPLE" ? "☑" : "☐"}</td>
+            <td className="border p-2 text-center">{item.answer === "NO CUMPLE" ? "☑" : "☐"}</td>
+            <td className="border p-2 text-center">{item.answer === "NA" ? "☑" : "☐"}</td>
+            <td className="border p-2">{item.observation || "-"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div className="mt-8">
+  <h3 className="text-lg font-bold mb-4">
+    4. Almacenamiento de Sustancias Químicas
+  </h3>
+
+  <div className="overflow-x-auto">
+    <table className="w-full border text-sm">
+      <thead>
+        <tr className="bg-neutral-100">
+          <th className="border p-2 text-left">Ítem</th>
+          <th className="border p-2 text-center w-20">C</th>
+          <th className="border p-2 text-center w-20">NC</th>
+          <th className="border p-2 text-center w-20">N/A</th>
+          <th className="border p-2 text-left">Observación</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {selectedRecord.chemical_storage?.map((item: any, index: number) => (
+          <tr key={index}>
+            <td className="border p-2">{item.item}</td>
+            <td className="border p-2 text-center">
+              {item.answer === "CUMPLE" ? "☑" : "☐"}
+            </td>
+            <td className="border p-2 text-center">
+              {item.answer === "NO CUMPLE" ? "☑" : "☐"}
+            </td>
+            <td className="border p-2 text-center">
+              {item.answer === "NA" ? "☑" : "☐"}
+            </td>
+            <td className="border p-2">
+              {item.observation || "-"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div className="mt-8">
+  <h3 className="text-lg font-bold mb-4">
+    5. Baños
+  </h3>
+
+  {selectedRecord.bathrooms?.map(
+    (bathroom: any, bathroomIndex: number) => (
+      <div key={bathroomIndex} className="mb-6">
+
+        <h4 className="font-semibold mb-2">
+          {bathroom.bathroom}
+        </h4>
+
+        <table className="w-full border text-sm">
+          <thead>
+            <tr className="bg-neutral-100">
+              <th className="border p-2 text-left">Ítem</th>
+              <th className="border p-2 text-center w-20">BE</th>
+              <th className="border p-2 text-center w-20">ME</th>
+              <th className="border p-2 text-center w-20">N/A</th>
+              <th className="border p-2 text-left">Observación</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {bathroom.items?.map(
+              (item: any, itemIndex: number) => (
+                <tr key={itemIndex}>
+                  <td className="border p-2">
+                    {item.item}
+                  </td>
+
+                  <td className="border p-2 text-center">
+                    {item.status === "BE" ? "☑" : "☐"}
+                  </td>
+
+                  <td className="border p-2 text-center">
+                    {item.status === "ME" ? "☑" : "☐"}
+                  </td>
+
+                  <td className="border p-2 text-center">
+                    {item.status === "NA" ? "☑" : "☐"}
+                  </td>
+
+                  <td className="border p-2">
+                    {item.observation || "-"}
+                  </td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+
+      </div>
+    )
+  )}
+</div>
+<div className="mt-8">
+  <h3 className="text-lg font-bold mb-4">
+    6. Planta de tratamiento de agua
+  </h3>
+
+  <div className="overflow-x-auto">
+    <table className="w-full border text-sm">
+      <thead>
+        <tr className="bg-neutral-100">
+          <th className="border p-2 text-left">Ítem</th>
+          <th className="border p-2 text-center w-20">C</th>
+          <th className="border p-2 text-center w-20">NC</th>
+          <th className="border p-2 text-center w-20">N/A</th>
+          <th className="border p-2 text-left">Observación</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {selectedRecord.water_treatment?.map(
+          (item: any, index: number) => (
+            <tr key={index}>
+              <td className="border p-2">
+                {item.item}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.answer === "CUMPLE" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.answer === "NO CUMPLE" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.answer === "NA" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2">
+                {item.observation || "-"}
+              </td>
+            </tr>
+          )
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div className="mt-8">
+  <h3 className="text-lg font-bold mb-4">
+    7. Red hidráulica
+  </h3>
+
+  <div className="overflow-x-auto">
+    <table className="w-full border text-sm">
+      <thead>
+        <tr className="bg-neutral-100">
+          <th className="border p-2 text-left">Ítem</th>
+          <th className="border p-2 text-center w-20">C</th>
+          <th className="border p-2 text-center w-20">NC</th>
+          <th className="border p-2 text-center w-20">N/A</th>
+          <th className="border p-2 text-left">Observación</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {selectedRecord.hydraulic_network?.map(
+          (item: any, index: number) => (
+            <tr key={index}>
+              <td className="border p-2">
+                {item.item}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.answer === "CUMPLE" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.answer === "NO CUMPLE" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {item.answer === "NA" ? "☑" : "☐"}
+              </td>
+
+              <td className="border p-2">
+                {item.observation || "-"}
+              </td>
+            </tr>
+          )
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{selectedRecord.signature_url && (
+  <div className="mt-10 pt-6 border-t">
+    <div className="font-semibold mb-2">
+      Firma del inspector
+    </div>
+
+    <img
+      src={selectedRecord.signature_url}
+      alt="Firma inspector"
+      className="max-h-28 object-contain border"
+    />
+
+    <div className="mt-2 text-sm">
+      {selectedRecord.inspector_name || "Inspector"}
+    </div>
+  </div>
+)}
+  </section>
+)}
+
         {viewMode === "list" && (
           <section className="border rounded-xl p-6 bg-white shadow-sm space-y-4">
 
@@ -1329,32 +1793,34 @@ useEffect(() => {
     </div>
   )}
 
-  {records.map((record) => (
-    <div
-      key={record.id}
-      className="border rounded-xl p-4 bg-white shadow-sm space-y-2"
-    >
-      <div className="font-bold">
-        {record.inspection_date || "Sin fecha"} — {record.result || "Sin resultado"}
-      </div>
-
-      <div className="text-sm text-neutral-600">
-        Inspector: {record.inspector_name || "No registrado"}
-      </div>
-
-      <div className="text-sm text-neutral-600">
-        Ubicación: {record.location || "No registrada"}
-      </div>
-
-      <div className="text-sm text-neutral-600">
-        Sitio específico: {record.specific_site || "No registrado"}
-      </div>
-
-      <div className="text-sm text-neutral-600">
-        Pozo: {record.well || "No registrado"}
-      </div>
+{records.map((record) => (
+  <button
+    key={record.id}
+    type="button"
+    onClick={() => {
+      setSelectedRecord(record);
+      setViewMode("detail");
+    }}
+    className="w-full text-left border rounded-xl p-4 bg-white shadow-sm space-y-2 hover:bg-neutral-50"
+  >
+    <div className="font-bold">
+      {record.inspection_date || "Sin fecha"} — {record.result || "Sin resultado"}
     </div>
-  ))}
+
+    <div className="text-sm text-neutral-600">
+      Inspector: {record.inspector_name || "No registrado"}
+    </div>
+
+    <div className="text-sm text-neutral-600">
+      Ubicación: {record.location || "No registrada"}
+    </div>
+
+    <div className="text-sm text-neutral-600">
+      Sitio específico: {record.specific_site || "No registrado"}
+    </div>
+  </button>
+))}
+
 </div>
 
           </section>
