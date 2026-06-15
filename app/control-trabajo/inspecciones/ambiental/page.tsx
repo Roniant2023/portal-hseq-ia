@@ -140,8 +140,9 @@ const [openSections, setOpenSections] = useState({
   bathrooms: false,
   waterTreatment: false,
   hydraulicNetwork: false,
-});
 
+});
+const [activeSection, setActiveSection] = useState("orderCleanliness");
 function toggleSection(section: keyof typeof openSections) {
   setOpenSections((prev) => ({
     ...prev,
@@ -149,6 +150,17 @@ function toggleSection(section: keyof typeof openSections) {
   }));
 }
 
+
+
+const inspectionSections = [
+  { id: "orderCleanliness", label: "Orden y aseo" },
+  { id: "environmentalKit", label: "Kit ambiental" },
+  { id: "ecologicalPoint", label: "Punto ecológico" },
+  { id: "chemicalStorage", label: "Químicos" },
+  { id: "bathrooms", label: "Baños" },
+  { id: "waterTreatment", label: "PTAR / Agua" },
+  { id: "hydraulicNetwork", label: "Red hidráulica" },
+];
 const [form, setForm] = useState({
   inspection_date: "",
   inspector_name: "",
@@ -209,6 +221,33 @@ hydraulic_network: HYDRAULIC_NETWORK_ITEMS.map((item) => ({
 
 });
 
+function getSectionStatus(section: string) {
+  let items: any[] = [];
+
+  if (section === "orderCleanliness") items = form.order_cleanliness;
+  if (section === "environmentalKit") items = form.environmental_kit;
+  if (section === "ecologicalPoint") items = form.ecological_point;
+  if (section === "chemicalStorage") items = form.chemical_storage;
+  if (section === "bathrooms") items = form.bathrooms;
+  if (section === "waterTreatment") items = form.water_treatment;
+  if (section === "hydraulicNetwork") items = form.hydraulic_network;
+
+  const serialized = JSON.stringify(items);
+
+  const hasFinding =
+    serialized.includes("NO CUMPLE") ||
+    serialized.includes('"NO"') ||
+    serialized.includes('"M"') ||
+    serialized.includes('"RC"') ||
+    serialized.includes('"ME"');
+
+  const hasObservation = serialized.includes('"observation":"') &&
+    !serialized.includes('"observation":""');
+
+  if (hasFinding) return "finding";
+  if (hasObservation) return "progress";
+  return "pending";
+}
 function updateField(key: string, value: any) {
   setForm((prev) => ({
     ...prev,
@@ -521,6 +560,48 @@ useEffect(() => {
 
 </div>            
 
+<div className="border rounded-xl p-4 bg-neutral-50">
+  <div className="font-bold text-lg mb-3">
+    Módulos de inspección
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    {inspectionSections.map((section) => {
+      const status = getSectionStatus(section.id);
+
+      const colorClass =
+        status === "finding"
+          ? "bg-red-600 text-white border-red-700"
+          : status === "progress"
+          ? "bg-yellow-400 text-black border-yellow-500"
+          : activeSection === section.id
+          ? "bg-green-700 text-white border-green-800"
+          : "bg-white text-black border-neutral-300";
+
+      return (
+        <button
+          key={section.id}
+          type="button"
+          onClick={() => setActiveSection(section.id)}
+          className={`rounded-xl border p-4 text-left font-semibold transition hover:shadow ${colorClass}`}
+        >
+          {section.label}
+
+          <div className="mt-1 text-xs font-normal">
+            {status === "finding"
+              ? "Con hallazgos"
+              : status === "progress"
+              ? "En proceso"
+              : activeSection === section.id
+              ? "Seleccionado"
+              : "No iniciado"}
+          </div>
+        </button>
+      );
+    })}
+  </div>
+</div>
+{activeSection === "orderCleanliness" && (
 <div className="border rounded-xl p-4 space-y-4">
   <button
     type="button"
@@ -567,7 +648,8 @@ useEffect(() => {
     </div>
   ))}
 </div>
-
+)}
+{activeSection === "environmentalKit" && (
 <div className="border rounded-xl p-4 space-y-4">
   <button
     type="button"
@@ -643,7 +725,8 @@ useEffect(() => {
     </div>
   ))}
 </div>
-
+)}
+{activeSection === "ecologicalPoint" && (
 <div className="border rounded-xl p-4 space-y-4">
   <button
     type="button"
@@ -695,7 +778,8 @@ useEffect(() => {
     </div>
   ))}
 </div>
-
+)}
+{activeSection === "chemicalStorage" && (
 <div className="border rounded-xl p-4 space-y-4">
   <button
     type="button"
@@ -745,6 +829,8 @@ useEffect(() => {
     </div>
   ))}
 </div>
+)}
+{activeSection === "bathrooms" && (
 <div className="border rounded-xl p-4 space-y-4">
   <button
     type="button"
@@ -809,7 +895,8 @@ useEffect(() => {
     </div>
   ))}
 </div>
-
+)}
+{activeSection === "waterTreatment" && (
 <div className="border rounded-xl p-4 space-y-4">
   <button
     type="button"
@@ -861,7 +948,8 @@ useEffect(() => {
     </div>
   ))}
 </div>
-
+)}
+{activeSection === "hydraulicNetwork" && (
 <div className="border rounded-xl p-4 space-y-4">
   <button
     type="button"
@@ -911,7 +999,7 @@ useEffect(() => {
     </div>
   ))}
 </div>
-
+)}
 <button
   type="button"
   onClick={saveInspection}
