@@ -144,7 +144,7 @@ const [openSections, setOpenSections] = useState({
 });
 const [activeSection, setActiveSection] = useState("orderCleanliness");
 const [reviewedSections, setReviewedSections] = useState<string[]>([]);
-
+const [notApplicableSections, setNotApplicableSections] = useState<string[]>([]);
 function toggleSection(section: keyof typeof openSections) {
   setOpenSections((prev) => ({
     ...prev,
@@ -248,7 +248,8 @@ function getSectionStatus(section: string) {
   const hasObservation = serialized.includes('"observation":"') &&
     !serialized.includes('"observation":""');
 
-  if (hasFinding) return "finding";
+if (hasFinding) return "finding";
+if (notApplicableSections.includes(section)) return "na";
 if (reviewedSections.includes(section)) return "completed";
 if (hasObservation) return "progress";
 return "pending";
@@ -258,6 +259,108 @@ function updateField(key: string, value: any) {
     ...prev,
     [key]: value,
   }));
+}
+
+function markSectionAsNotApplicable(section: string) {
+ if (notApplicableSections.includes(section)) {
+  setNotApplicableSections((prev) =>
+    prev.filter((item) => item !== section)
+  );
+
+  setReviewedSections((prev) =>
+    prev.filter((item) => item !== section)
+  );
+
+  return;
+}
+  if (section === "orderCleanliness") {
+    updateField(
+      "order_cleanliness",
+      form.order_cleanliness.map((item) => ({
+        ...item,
+        answer: "NA",
+        observation: "No aplica para el sitio inspeccionado.",
+      }))
+    );
+  }
+
+  if (section === "environmentalKit") {
+    updateField(
+      "environmental_kit",
+      form.environmental_kit.map((item) => ({
+        ...item,
+        available: "NA",
+        status: "NA",
+        observation: "No aplica para el sitio inspeccionado.",
+      }))
+    );
+  }
+
+  if (section === "ecologicalPoint") {
+    updateField(
+      "ecological_point",
+      form.ecological_point.map((item) => ({
+        ...item,
+        answer: "NA",
+        observation: "No aplica para el sitio inspeccionado.",
+      }))
+    );
+  }
+
+  if (section === "chemicalStorage") {
+    updateField(
+      "chemical_storage",
+      form.chemical_storage.map((item) => ({
+        ...item,
+        answer: "NA",
+        observation: "No aplica para el sitio inspeccionado.",
+      }))
+    );
+  }
+
+  if (section === "bathrooms") {
+    updateField(
+      "bathrooms",
+      form.bathrooms.map((bathroom) => ({
+        ...bathroom,
+        items: bathroom.items.map((item) => ({
+          ...item,
+          status: "NA",
+          observation: "No aplica para el sitio inspeccionado.",
+        })),
+      }))
+    );
+  }
+
+  if (section === "waterTreatment") {
+    updateField(
+      "water_treatment",
+      form.water_treatment.map((item) => ({
+        ...item,
+        answer: "NA",
+        observation: "No aplica para el sitio inspeccionado.",
+      }))
+    );
+  }
+
+  if (section === "hydraulicNetwork") {
+    updateField(
+      "hydraulic_network",
+      form.hydraulic_network.map((item) => ({
+        ...item,
+        answer: "NA",
+        observation: "No aplica para el sitio inspeccionado.",
+      }))
+    );
+  }
+
+ 
+
+setNotApplicableSections((prev) => [...prev, section]);
+
+if (!reviewedSections.includes(section)) {
+  setReviewedSections((prev) => [...prev, section]);
+}
 }
 
 function calculateResult() {
@@ -286,6 +389,60 @@ function calculateResult() {
     : "CUMPLE";
 }
 
+function getInspectionSummary() {
+  const findings: string[] = [];
+
+  if (form.order_cleanliness.some((item) => item.answer === "NO CUMPLE")) {
+    findings.push("Orden y aseo");
+  }
+
+  if (
+    form.environmental_kit.some(
+      (item) =>
+        item.available === "NO" ||
+        item.status === "M" ||
+        item.status === "RC"
+    )
+  ) {
+    findings.push("Kit ambiental");
+  }
+
+  if (form.ecological_point.some((item) => item.answer === "NO CUMPLE")) {
+    findings.push("Punto ecológico");
+  }
+
+  if (form.chemical_storage.some((item) => item.answer === "NO CUMPLE")) {
+    findings.push("Químicos");
+  }
+
+  if (
+    form.bathrooms.some((bathroom) =>
+      bathroom.items.some((item) => item.status === "ME")
+    )
+  ) {
+    findings.push("Baños");
+  }
+
+  if (form.water_treatment.some((item) => item.answer === "NO CUMPLE")) {
+    findings.push("PTAR / Agua");
+  }
+
+  if (form.hydraulic_network.some((item) => item.answer === "NO CUMPLE")) {
+    findings.push("Red hidráulica");
+  }
+
+  const notApplicableLabels = inspectionSections
+    .filter((section) => notApplicableSections.includes(section.id))
+    .map((section) => section.label);
+
+  return {
+    result: calculateResult(),
+    findings,
+    notApplicableLabels,
+  };
+}
+
+const inspectionSummary = getInspectionSummary();
 async function saveInspection() {
   try {
     setSaving(true);
@@ -577,36 +734,57 @@ useEffect(() => {
       const colorClass =
      status === "finding"
   ? "bg-red-600 text-white border-red-700"
-  : status === "completed"
-  ? "bg-green-700 text-white border-green-800"
-  : status === "progress"
+ : status === "completed"
+? "bg-green-700 text-white border-green-800"
+: status === "na"
+? "bg-neutral-600 text-white border-neutral-700"
+: status === "progress"
           ? "bg-yellow-400 text-black border-yellow-500"
          : activeSection === section.id
 ? "bg-blue-700 text-white border-blue-800"
 : "bg-white text-black border-neutral-300";
 
-      return (
-        <button
-          key={section.id}
-          type="button"
-          onClick={() => setActiveSection(section.id)}
-          className={`rounded-xl border p-4 text-left font-semibold transition hover:shadow ${colorClass}`}
-        >
-          {section.label}
+     return (
+  <div
+    key={section.id}
+    className={`rounded-xl border p-4 transition hover:shadow ${colorClass}`}
+  >
+    <button
+      type="button"
+      onClick={() => setActiveSection(section.id)}
+      className="w-full text-left font-semibold"
+    >
+      {section.label}
 
-          <div className="mt-1 text-xs font-normal">
-           {status === "finding"
-  ? "Con hallazgos"
-  : status === "completed"
-  ? "Revisado"
-  : status === "progress"
-  ? "En proceso"
-  : activeSection === section.id
-  ? "Seleccionado"
-  : "No iniciado"}
-          </div>
-        </button>
-      );
+      <div className="mt-1 text-xs font-normal">
+        {status === "finding"
+          ? "Con hallazgos"
+          : status === "completed"
+? "Revisado"
+: status === "na"
+? "No aplica"
+: status === "progress"
+          ? "En proceso"
+          : activeSection === section.id
+          ? "Seleccionado"
+          : "No iniciado"}
+      </div>
+    </button>
+
+    <label className="mt-3 flex items-center gap-2 rounded border border-black bg-white px-3 py-2 text-xs font-semibold text-black">
+  <input
+    type="checkbox"
+    checked={notApplicableSections.includes(section.id)}
+    onChange={(e) => {
+      e.stopPropagation();
+      markSectionAsNotApplicable(section.id);
+    }}
+  />
+
+  No aplica
+</label>
+  </div>
+);
     })}
   </div>
 </div>
@@ -1121,6 +1299,33 @@ useEffect(() => {
 </button>
 </div>
 )}
+{allSectionsReviewed && (
+  <div className="rounded-xl border border-black bg-white p-4 space-y-3">
+    <div className="text-lg font-bold">
+      Resumen final de la inspección
+    </div>
+
+    <div className="text-sm">
+      <strong>Resultado general:</strong>{" "}
+      {inspectionSummary.result}
+    </div>
+
+    <div className="text-sm">
+      <strong>Módulos con hallazgos:</strong>{" "}
+      {inspectionSummary.findings.length > 0
+        ? inspectionSummary.findings.join(", ")
+        : "Sin hallazgos"}
+    </div>
+
+    <div className="text-sm">
+      <strong>Módulos no aplicables:</strong>{" "}
+      {inspectionSummary.notApplicableLabels.length > 0
+        ? inspectionSummary.notApplicableLabels.join(", ")
+        : "Ninguno"}
+    </div>
+  </div>
+)}
+
 {allSectionsReviewed ? (
   <button
     type="button"
