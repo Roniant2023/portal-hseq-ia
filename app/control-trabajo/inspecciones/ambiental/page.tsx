@@ -168,10 +168,7 @@ const allSectionsReviewed =
 const [form, setForm] = useState({
   inspection_date: "",
   inspector_name: "",
-  work_front: "",
-  unit: "",
   operator: "",
-  well: "",
   location: "",
   specific_site: "",
   location_other: "",
@@ -459,10 +456,7 @@ async function saveInspection() {
     const payload = {
       inspection_date: form.inspection_date,
       inspector_name: form.inspector_name,
-      work_front: form.work_front,
-      unit: form.unit,
       operator: form.operator,
-      well: form.well,
       location:
         form.location === "Otros" ? form.location_other : form.location,
       location_other: form.location_other,
@@ -632,48 +626,6 @@ useEffect(() => {
       value={form.operator}
       onChange={(e) =>
         updateField("operator", e.target.value)
-      }
-    />
-  </div>
-
-  <div>
-    <label className="text-xs font-medium">
-      Frente de trabajo
-    </label>
-
-    <input
-      className="border p-2 rounded w-full"
-      value={form.work_front}
-      onChange={(e) =>
-        updateField("work_front", e.target.value)
-      }
-    />
-  </div>
-
-  <div>
-    <label className="text-xs font-medium">
-      Unidad
-    </label>
-
-    <input
-      className="border p-2 rounded w-full"
-      value={form.unit}
-      onChange={(e) =>
-        updateField("unit", e.target.value)
-      }
-    />
-  </div>
-
-  <div>
-    <label className="text-xs font-medium">
-      Pozo
-    </label>
-
-    <input
-      className="border p-2 rounded w-full"
-      value={form.well}
-      onChange={(e) =>
-        updateField("well", e.target.value)
       }
     />
   </div>
