@@ -41,6 +41,7 @@ const formularioInicial = {
 export default function TrabajadoresEppPage() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [form, setForm] = useState(formularioInicial);
+const [otraBase, setOtraBase] = useState("");
 
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -108,7 +109,15 @@ export default function TrabajadoresEppPage() {
       setError("Debes ingresar los apellidos del trabajador.");
       return;
     }
+if (!form.base) {
+  setError("Debes seleccionar la base habitual.");
+  return;
+}
 
+if (form.base === "OTRO" && !otraBase.trim()) {
+  setError("Debes indicar cuál base o patio.");
+  return;
+}
     setGuardando(true);
 
     const nuevoTrabajador = {
@@ -118,7 +127,10 @@ export default function TrabajadoresEppPage() {
 
       cargo: form.cargo.trim() || null,
       area_operacion: form.area_operacion.trim() || null,
-      base: form.base.trim() || null,
+      base:
+  form.base === "OTRO"
+    ? otraBase.trim().toUpperCase() || null
+    : form.base.trim() || null,
 
       empresa:
         form.empresa.trim() ||
@@ -159,7 +171,7 @@ export default function TrabajadoresEppPage() {
     }
 
     setForm(formularioInicial);
-
+setOtraBase("");
     setMensaje(
       "Trabajador registrado correctamente."
     );
@@ -373,17 +385,46 @@ export default function TrabajadoresEppPage() {
                   }
                 />
 
-                <Campo
-                  label="Base habitual"
-                  value={form.base}
-                  placeholder="Ej. Base Palermo"
-                  onChange={(v) =>
-                    actualizarCampo(
-                      "base",
-                      v
-                    )
-                  }
-                />
+              <div>
+  <label className="block mb-2 text-sm font-bold">
+    Base habitual
+  </label>
+
+  <select
+    value={form.base}
+    onChange={(e) => {
+      actualizarCampo("base", e.target.value);
+
+      if (e.target.value !== "OTRO") {
+        setOtraBase("");
+      }
+    }}
+    className="w-full rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-black"
+  >
+    <option value="">Seleccione una base o patio</option>
+    <option value="BASE TOCANCIPA">BASE TOCANCIPA</option>
+    <option value="BASE PALERMO">BASE PALERMO</option>
+    <option value="PATIO LA FLORIDA">PATIO LA FLORIDA</option>
+    <option value="PATIO APIAY">PATIO APIAY</option>
+    <option value="OTRO">OTRO</option>
+  </select>
+
+  {form.base === "OTRO" && (
+    <div className="mt-3">
+      <label className="block mb-2 text-sm font-bold">
+        ¿Cuál base o patio?
+      </label>
+
+      <input
+        type="text"
+        value={otraBase}
+        onChange={(e) => setOtraBase(e.target.value)}
+        placeholder="Escriba el nombre de la base o patio"
+        className="w-full rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-black"
+      />
+    </div>
+  )}
+</div>
 
                 <Campo
                   label="Empresa"
