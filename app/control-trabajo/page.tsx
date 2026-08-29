@@ -19,6 +19,12 @@ const tools = [
       "Extintores, equipos, vehículos, herramientas y más.",
     href: "/control-trabajo/inspecciones",
   },
+{
+  title: "Gestión de EPP",
+  description:
+    "Entrega, inventario, reposición y seguimiento de elementos de protección personal.",
+  href: "/control-trabajo/epp",
+},
 ];
 
 export default function ControlTrabajoPage() {
