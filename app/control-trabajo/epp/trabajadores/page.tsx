@@ -42,6 +42,7 @@ export default function TrabajadoresEppPage() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [form, setForm] = useState(formularioInicial);
 const [otraBase, setOtraBase] = useState("");
+const [otroCargo, setOtroCargo] = useState("");
 
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -118,6 +119,16 @@ if (form.base === "OTRO" && !otraBase.trim()) {
   setError("Debes indicar cuál base o patio.");
   return;
 }
+
+if (!form.cargo) {
+  setError("Debes seleccionar el cargo del trabajador.");
+  return;
+}
+
+if (form.cargo === "OTRO" && !otroCargo.trim()) {
+  setError("Debes indicar cuál es el cargo.");
+  return;
+}
     setGuardando(true);
 
     const nuevoTrabajador = {
@@ -125,7 +136,10 @@ if (form.base === "OTRO" && !otraBase.trim()) {
       nombres: form.nombres.trim().toUpperCase(),
       apellidos: form.apellidos.trim().toUpperCase(),
 
-      cargo: form.cargo.trim() || null,
+      cargo:
+  form.cargo === "OTRO"
+    ? otroCargo.trim().toUpperCase() || null
+    : form.cargo.trim() || null,
       area_operacion: form.area_operacion.trim() || null,
       base:
   form.base === "OTRO"
@@ -172,9 +186,10 @@ if (form.base === "OTRO" && !otraBase.trim()) {
 
     setForm(formularioInicial);
 setOtraBase("");
-    setMensaje(
-      "Trabajador registrado correctamente."
-    );
+setOtroCargo("");
+setMensaje(
+  "Trabajador registrado correctamente."
+);
 
     await cargarTrabajadores();
 
@@ -361,17 +376,97 @@ setOtraBase("");
                   }
                 />
 
-                <Campo
-                  label="Cargo"
-                  value={form.cargo}
-                  placeholder="Ej. Operador de Cementación"
-                  onChange={(v) =>
-                    actualizarCampo(
-                      "cargo",
-                      v
-                    )
-                  }
-                />
+                <div>
+  <label className="block mb-2 text-sm font-bold">
+    Cargo
+  </label>
+
+  <select
+    value={form.cargo}
+    onChange={(e) => {
+      actualizarCampo("cargo", e.target.value);
+
+      if (e.target.value !== "OTRO") {
+        setOtroCargo("");
+      }
+    }}
+    className="w-full rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-black"
+  >
+    <option value="">Seleccione un cargo</option>
+
+    <option value="GERENTE DE WELL SERVICES">
+      GERENTE DE WELL SERVICES
+    </option>
+
+    <option value="COORDINADOR DE INGENIERÍA">
+      COORDINADOR DE INGENIERÍA
+    </option>
+
+    <option value="COORDINADOR OPERATIVO CMT/CT">
+      COORDINADOR OPERATIVO CMT/CT
+    </option>
+
+    <option value="INGENIERO DE WELL SERVICES">
+      INGENIERO DE WELL SERVICES
+    </option>
+
+    <option value="INGENIERO DE LABORATORIO">
+      INGENIERO DE LABORATORIO
+    </option>
+
+    <option value="TÉCNICO DE LABORATORIO">
+      TÉCNICO DE LABORATORIO
+    </option>
+
+    <option value="SUPERVISOR HSEQ">
+      SUPERVISOR HSEQ
+    </option>
+
+    <option value="SUPERVISOR DE WELL SERVICES">
+      SUPERVISOR DE WELL SERVICES
+    </option>
+
+    <option value="OPERADOR DE WELL SERVICES">
+      OPERADOR DE WELL SERVICES
+    </option>
+
+    <option value="AYUDANTE DE WELL SERVICES">
+      AYUDANTE DE WELL SERVICES
+    </option>
+
+    <option value="SOLDADOR">
+      SOLDADOR
+    </option>
+
+    <option value="ELECTROMECÁNICO">
+      ELECTROMECÁNICO
+    </option>
+
+    <option value="ALMACENISTA">
+      ALMACENISTA
+    </option>
+
+    <option value="OTRO">
+      OTRO
+    </option>
+  </select>
+
+  {form.cargo === "OTRO" && (
+    <div className="mt-3">
+      <label className="block mb-2 text-sm font-bold">
+        ¿Cuál cargo?
+      </label>
+
+      <input
+        type="text"
+        value={otroCargo}
+        onChange={(e) => setOtroCargo(e.target.value)}
+        placeholder="Escriba el nombre del cargo"
+        className="w-full rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-black"
+      />
+    </div>
+  )}
+</div>
 
                 <Campo
                   label="Área / operación"

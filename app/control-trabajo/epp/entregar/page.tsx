@@ -20,7 +20,13 @@ type Ubicacion = {
   id: string;
   nombre: string;
 };
-
+type MatrizCargo = {
+  cargo: string;
+  epp_id: string;
+  obligatorio: boolean;
+  cantidad_requerida: number;
+  activo: boolean;
+};
 type Inventario = {
   id: string;
   epp_id: string;
@@ -76,7 +82,7 @@ export default function EntregarEppPage() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [ubicaciones, setUbicaciones] = useState<Ubicacion[]>([]);
   const [inventario, setInventario] = useState<Inventario[]>([]);
-
+const [matrizCargo, setMatrizCargo] = useState<MatrizCargo[]>([]);
   const [trabajadorId, setTrabajadorId] = useState("");
   const [ubicacionId, setUbicacionId] = useState("");
   const [entregadoPor, setEntregadoPor] = useState("");
@@ -102,10 +108,11 @@ export default function EntregarEppPage() {
     setError("");
 
     const [
-      respuestaTrabajadores,
-      respuestaUbicaciones,
-      respuestaInventario,
-    ] = await Promise.all([
+  respuestaTrabajadores,
+  respuestaUbicaciones,
+  respuestaInventario,
+  respuestaMatrizCargo,
+] = await Promise.all([
       supabase
         .from("epp_trabajadores")
         .select(`
@@ -152,9 +159,20 @@ export default function EntregarEppPage() {
             nombre
           )
         `)
-        .gt("cantidad_disponible", 0)
+               .gt("cantidad_disponible", 0)
         .eq("estado", "DISPONIBLE")
         .order("created_at", { ascending: true }),
+
+      supabase
+        .from("epp_matriz_cargo")
+        .select(`
+          cargo,
+          epp_id,
+          obligatorio,
+          cantidad_requerida,
+          activo
+        `)
+        .eq("activo", true),
     ]);
 
     if (respuestaTrabajadores.error) {
@@ -189,7 +207,16 @@ export default function EntregarEppPage() {
         (respuestaInventario.data ?? []) as unknown as Inventario[]
       );
     }
-
+if (respuestaMatrizCargo.error) {
+  console.error(respuestaMatrizCargo.error);
+  setError(
+    `No fue posible consultar la matriz de EPP por cargo: ${respuestaMatrizCargo.error.message}`
+  );
+} else {
+  setMatrizCargo(
+    (respuestaMatrizCargo.data ?? []) as MatrizCargo[]
+  );
+}
     setCargando(false);
   }
 
@@ -202,38 +229,63 @@ export default function EntregarEppPage() {
   );
 
   const inventarioDisponible = useMemo(() => {
-    if (!ubicacionId) return [];
+  if (!ubicacionId || !trabajadorSeleccionado?.cargo) {
+    return [];
+  }
 
-    const texto = busquedaInventario.trim().toLowerCase();
+  const cargoTrabajador = trabajadorSeleccionado.cargo
+    .trim()
+    .toUpperCase();
 
-    return inventario.filter((registro) => {
-      if (registro.ubicacion_id !== ubicacionId) {
-        return false;
-      }
+  const eppPermitidos = new Set(
+    matrizCargo
+      .filter(
+        (registro) =>
+          registro.cargo.trim().toUpperCase() === cargoTrabajador &&
+          registro.activo
+      )
+      .map((registro) => registro.epp_id)
+  );
 
-      if (registro.cantidad_disponible <= 0) {
-        return false;
-      }
+  const texto = busquedaInventario.trim().toLowerCase();
 
-      if (!texto) {
-        return true;
-      }
+  return inventario.filter((registro) => {
+    if (registro.ubicacion_id !== ubicacionId) {
+      return false;
+    }
 
-      const contenido = [
-        registro.epp_catalogo?.codigo,
-        registro.epp_catalogo?.nombre,
-        registro.talla,
-        registro.lote,
-        registro.serial,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+    if (registro.cantidad_disponible <= 0) {
+      return false;
+    }
 
-      return contenido.includes(texto);
-    });
-  }, [inventario, ubicacionId, busquedaInventario]);
+    if (!eppPermitidos.has(registro.epp_id)) {
+      return false;
+    }
 
+    if (!texto) {
+      return true;
+    }
+
+    const contenido = [
+      registro.epp_catalogo?.codigo,
+      registro.epp_catalogo?.nombre,
+      registro.talla,
+      registro.lote,
+      registro.serial,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return contenido.includes(texto);
+  });
+}, [
+  inventario,
+  ubicacionId,
+  busquedaInventario,
+  trabajadorSeleccionado?.cargo,
+  matrizCargo,
+]);
   const registroSeleccionado = inventario.find(
     (registro) => registro.id === inventarioSeleccionado
   );
@@ -430,10 +482,15 @@ export default function EntregarEppPage() {
                   <Etiqueta texto="Trabajador *" />
 
                   <select
-                    value={trabajadorId}
-                    onChange={(e) =>
-                      setTrabajadorId(e.target.value)
-                    }
+                   
+  value={trabajadorId}
+  onChange={(e) => {
+    setTrabajadorId(e.target.value);
+    setInventarioSeleccionado("");
+    setItems([]);
+    setBusquedaInventario("");
+    setCantidad("1");
+  }}
                     className="w-full rounded-xl border border-neutral-300 px-4 py-3"
                   >
                     <option value="">
