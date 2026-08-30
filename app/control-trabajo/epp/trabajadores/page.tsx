@@ -822,13 +822,20 @@ setMensaje(
   <div className="flex flex-col gap-2">
 
     <a
-      href={`/control-trabajo/epp/trabajadores/${trabajador.id}`}
-      className="rounded-lg bg-neutral-950 px-3 py-2 text-center text-xs font-bold text-white hover:bg-neutral-800"
-    >
-      Ver ficha
-    </a>
+  href={`/control-trabajo/epp/trabajadores/${trabajador.id}`}
+  className="rounded-lg bg-neutral-950 px-3 py-2 text-center text-xs font-bold text-white hover:bg-neutral-800"
+>
+  Ver ficha
+</a>
 
-    <button
+<a
+  href={`/control-trabajo/epp/trabajadores/${trabajador.id}/editar`}
+  className="rounded-lg border border-neutral-900 px-3 py-2 text-center text-xs font-bold text-neutral-900 hover:bg-neutral-100"
+>
+  Editar
+</a>
+
+<button
       type="button"
       onClick={() =>
         cambiarEstado(
