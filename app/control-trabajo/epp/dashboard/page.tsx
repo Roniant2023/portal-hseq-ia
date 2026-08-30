@@ -69,6 +69,7 @@ type AlertaDotacion = {
   trabajador: string;
   identificacion: string;
   cargo: string;
+  epp_id: string;
   epp_codigo: string;
   epp_nombre: string;
   cantidad_requerida: number;
@@ -76,8 +77,11 @@ type AlertaDotacion = {
   proxima_dotacion: string | null;
   dias_restantes: number | null;
   estado: "SIN ENTREGA" | "VENCIDO" | "PRÓXIMO" | "VIGENTE";
-};
 
+  cantidad_reposiciones: number;
+  ultima_reposicion: string | null;
+  ultimo_motivo_reposicion: string | null;
+};
 type BarraDato = {
   nombre: string;
   valor: number;
@@ -360,20 +364,45 @@ export default function DashboardEPPPage() {
             estado = "VIGENTE";
           }
         }
+const reposicionesDelEpp = reposiciones
+  .filter(
+    (reposicion) =>
+      reposicion.trabajador_id === trabajador.id &&
+      reposicion.epp_id === regla.epp_id &&
+      ["ENTREGADA", "CERRADA"].includes(
+        reposicion.estado?.trim().toUpperCase()
+      )
+  )
+  .sort(
+    (a, b) =>
+      new Date(b.fecha_solicitud).getTime() -
+      new Date(a.fecha_solicitud).getTime()
+  );
 
+const ultimaReposicion =
+  reposicionesDelEpp[0] ?? null;
         resultado.push({
-          trabajador_id: trabajador.id,
-          trabajador: `${trabajador.nombres} ${trabajador.apellidos}`,
-          identificacion: trabajador.identificacion,
-          cargo: trabajador.cargo || "",
-          epp_codigo: epp.codigo,
-          epp_nombre: epp.nombre,
-          cantidad_requerida: regla.cantidad,
-          ultima_dotacion: ultimaDotacion,
-          proxima_dotacion: proximaDotacion,
-          dias_restantes: diasRestantes,
-          estado,
-        });
+  trabajador_id: trabajador.id,
+  trabajador: `${trabajador.nombres} ${trabajador.apellidos}`,
+  identificacion: trabajador.identificacion,
+  cargo: trabajador.cargo || "",
+
+  epp_id: regla.epp_id,
+  epp_codigo: epp.codigo,
+  epp_nombre: epp.nombre,
+
+  cantidad_requerida: regla.cantidad,
+  ultima_dotacion: ultimaDotacion,
+  proxima_dotacion: proximaDotacion,
+  dias_restantes: diasRestantes,
+  estado,
+
+  cantidad_reposiciones: reposicionesDelEpp.length,
+  ultima_reposicion:
+    ultimaReposicion?.fecha_solicitud ?? null,
+  ultimo_motivo_reposicion:
+    ultimaReposicion?.motivo ?? null,
+});
       }
     }
 
@@ -388,13 +417,14 @@ export default function DashboardEPPPage() {
       return orden[a.estado] - orden[b.estado];
     });
   }, [
-    trabajadores,
-    catalogo,
-    reglas,
-    matrizCargo,
-    entregas,
-    detalles,
-  ]);
+  trabajadores,
+  catalogo,
+  reglas,
+  matrizCargo,
+  entregas,
+  detalles,
+  reposiciones,
+]);
 
   const resumen = useMemo(() => {
     const trabajadoresConPendientes = new Set(
@@ -1157,12 +1187,16 @@ export default function DashboardEPPPage() {
                   </th>
 
                   <th className="px-4 py-3">
-                    Próxima dotación
-                  </th>
+  Próxima dotación
+</th>
 
-                  <th className="px-4 py-3">
-                    Estado
-                  </th>
+<th className="px-4 py-3">
+  Reposiciones
+</th>
+
+<th className="px-4 py-3">
+  Estado
+</th>
                 </tr>
               </thead>
 
@@ -1204,22 +1238,54 @@ export default function DashboardEPPPage() {
                         )}
                       </td>
 
-                      <td className="px-4 py-3">
-                        {formatearFecha(
-                          item.proxima_dotacion
-                        )}
-                      </td>
+                     <td className="px-4 py-3">
+  {formatearFecha(
+    item.proxima_dotacion
+  )}
+</td>
 
-                      <td className="px-4 py-3">
+<td className="px-4 py-3">
+  {item.cantidad_reposiciones > 0 ? (
+    <div>
+      <span className="inline-flex whitespace-nowrap rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
+        {item.cantidad_reposiciones}{" "}
+        {item.cantidad_reposiciones === 1
+          ? "reposición"
+          : "reposiciones"}
+      </span>
 
-                        <EstadoBadge
-                          estado={item.estado}
-                          dias={
-                            item.dias_restantes
-                          }
-                        />
+      {item.ultimo_motivo_reposicion && (
+        <div className="mt-1 text-xs font-semibold text-amber-800">
+          Última:{" "}
+          {formatearMotivo(
+            item.ultimo_motivo_reposicion
+          )}
+        </div>
+      )}
 
-                      </td>
+      {item.ultima_reposicion && (
+        <div className="mt-1 text-xs text-neutral-500">
+          {formatearFecha(
+            item.ultima_reposicion
+          )}
+        </div>
+      )}
+    </div>
+  ) : (
+    <span className="text-neutral-400">
+      —
+    </span>
+  )}
+</td>
+
+<td className="px-4 py-3">
+  <EstadoBadge
+    estado={item.estado}
+    dias={
+      item.dias_restantes
+    }
+  />
+</td>
                     </tr>
                   )
                 )}
@@ -1228,7 +1294,7 @@ export default function DashboardEPPPage() {
                   0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-4 py-10 text-center text-neutral-500"
                     >
                       No se encontraron

@@ -56,6 +56,17 @@ type Entrega = {
   epp_entrega_detalle?: DetalleEntrega[];
 };
 
+type Reposicion = {
+  id: string;
+  trabajador_id: string;
+  epp_id: string;
+  nueva_entrega_id: string | null;
+  motivo: string;
+  estado_epp_anterior: string | null;
+  justificacion: string | null;
+  estado: string;
+};
+
 export default function FichaTrabajadorPage() {
   const params = useParams();
   const id = params.id as string;
@@ -65,6 +76,9 @@ export default function FichaTrabajadorPage() {
 
   const [entregas, setEntregas] =
     useState<Entrega[]>([]);
+
+  const [reposiciones, setReposiciones] =
+    useState<Reposicion[]>([]);
 
   const [cargando, setCargando] =
     useState(true);
@@ -80,6 +94,7 @@ export default function FichaTrabajadorPage() {
       const [
         respuestaTrabajador,
         respuestaEntregas,
+        respuestaReposiciones,
       ] = await Promise.all([
         supabase
           .from("epp_trabajadores")
@@ -126,6 +141,23 @@ export default function FichaTrabajadorPage() {
             "fecha_entrega",
             { ascending: false }
           ),
+
+        supabase
+          .from("epp_reposiciones")
+          .select(`
+            id,
+            trabajador_id,
+            epp_id,
+            nueva_entrega_id,
+            motivo,
+            estado_epp_anterior,
+            justificacion,
+            estado
+          `)
+          .eq("trabajador_id", id)
+          .order("created_at", {
+            ascending: false,
+          }),
       ]);
 
       if (respuestaTrabajador.error) {
@@ -162,6 +194,22 @@ export default function FichaTrabajadorPage() {
         );
       }
 
+      if (respuestaReposiciones.error) {
+        console.error(
+          respuestaReposiciones.error
+        );
+
+        setError(
+          `No fue posible consultar las reposiciones: ${respuestaReposiciones.error.message}`
+        );
+
+        setReposiciones([]);
+      } else {
+        setReposiciones(
+          (respuestaReposiciones.data ?? []) as Reposicion[]
+        );
+      }
+
       setCargando(false);
     }
 
@@ -169,6 +217,20 @@ export default function FichaTrabajadorPage() {
       cargarFicha();
     }
   }, [id]);
+
+  const reposicionPorEntrega = useMemo(() => {
+    return new Map(
+      reposiciones
+        .filter(
+          (reposicion) =>
+            reposicion.nueva_entrega_id
+        )
+        .map((reposicion) => [
+          reposicion.nueva_entrega_id as string,
+          reposicion,
+        ])
+    );
+  }, [reposiciones]);
 
   const elementosEntregados =
     useMemo(() => {
@@ -195,9 +257,17 @@ export default function FichaTrabajadorPage() {
             ubicacion:
               entrega.epp_ubicaciones
                 ?.nombre ?? "—",
+
+            reposicion:
+              reposicionPorEntrega.get(
+                entrega.id
+              ) ?? null,
           }))
       );
-    }, [entregas]);
+    }, [
+      entregas,
+      reposicionPorEntrega,
+    ]);
 
   const totalUnidades =
     elementosEntregados.reduce(
@@ -244,6 +314,8 @@ export default function FichaTrabajadorPage() {
   return (
     <main className="min-h-screen bg-white text-neutral-900">
       <div className="mx-auto max-w-6xl px-6 py-10 space-y-8">
+
+        {/* ENCABEZADO */}
 
         <header>
           <a
@@ -294,7 +366,9 @@ export default function FichaTrabajadorPage() {
           </div>
         )}
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* INDICADORES */}
+
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
           <Indicador
             titulo="Entregas registradas"
@@ -313,7 +387,17 @@ export default function FichaTrabajadorPage() {
             }
           />
 
+          <Indicador
+            titulo="Reposiciones registradas"
+            valor={reposiciones.length}
+            destacado={
+              reposiciones.length > 0
+            }
+          />
+
         </section>
+
+        {/* INFORMACIÓN GENERAL */}
 
         <section className="rounded-3xl border border-neutral-200 p-6 md:p-8 shadow-sm">
 
@@ -362,6 +446,8 @@ export default function FichaTrabajadorPage() {
           </div>
         </section>
 
+        {/* TALLAS */}
+
         <section className="rounded-3xl border border-neutral-200 p-6 md:p-8 shadow-sm">
 
           <h2 className="text-2xl font-black">
@@ -407,6 +493,8 @@ export default function FichaTrabajadorPage() {
           </div>
         </section>
 
+        {/* EPP ASIGNADOS */}
+
         <section className="rounded-3xl border border-neutral-200 p-6 md:p-8 shadow-sm">
 
           <div>
@@ -446,7 +534,7 @@ export default function FichaTrabajadorPage() {
 
             <div className="mt-6 overflow-x-auto">
 
-              <table className="w-full min-w-[1050px] text-sm">
+              <table className="w-full min-w-[1100px] text-sm">
 
                 <thead>
                   <tr className="border-b text-left">
@@ -472,7 +560,11 @@ export default function FichaTrabajadorPage() {
                     </th>
 
                     <th className="py-3 pr-4">
-                      Motivo
+                      Tipo
+                    </th>
+
+                    <th className="py-3 pr-4">
+                      Causa
                     </th>
 
                     <th className="py-3 pr-4">
@@ -492,7 +584,11 @@ export default function FichaTrabajadorPage() {
                     (item) => (
                       <tr
                         key={item.id}
-                        className="border-b border-neutral-100"
+                        className={`border-b border-neutral-100 ${
+                          item.reposicion
+                            ? "bg-amber-50/40"
+                            : ""
+                        }`}
                       >
 
                         <td className="py-4 pr-4">
@@ -535,9 +631,27 @@ export default function FichaTrabajadorPage() {
                         </td>
 
                         <td className="py-4 pr-4">
-                          {formatearTexto(
-                            item.motivo
+
+                          <TipoEntregaBadge
+                            motivo={item.motivo}
+                          />
+
+                        </td>
+
+                        <td className="py-4 pr-4">
+
+                          {item.reposicion ? (
+                            <span className="font-semibold text-amber-800">
+                              {formatearTexto(
+                                item.reposicion.motivo
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-neutral-400">
+                              —
+                            </span>
                           )}
+
                         </td>
 
                         <td className="py-4 pr-4">
@@ -584,6 +698,8 @@ export default function FichaTrabajadorPage() {
 
         </section>
 
+        {/* HISTORIAL DE ENTREGAS */}
+
         <section className="rounded-3xl border border-neutral-200 p-6 md:p-8 shadow-sm">
 
           <h2 className="text-2xl font-black">
@@ -606,91 +722,171 @@ export default function FichaTrabajadorPage() {
             <div className="mt-6 space-y-4">
 
               {entregas.map(
-                (entrega) => (
-                  <div
-                    key={entrega.id}
-                    className="rounded-2xl border border-neutral-200 p-5"
-                  >
+                (entrega) => {
+                  const reposicion =
+                    reposicionPorEntrega.get(
+                      entrega.id
+                    );
 
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  return (
+                    <div
+                      key={entrega.id}
+                      className={`rounded-2xl border p-5 ${
+                        reposicion
+                          ? "border-amber-200 bg-amber-50/40"
+                          : "border-neutral-200"
+                      }`}
+                    >
 
-                      <div>
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 
-                        <div className="font-black">
-                          {formatearFecha(
-                            entrega.fecha_entrega
-                          )}
+                        <div>
+
+                          <div className="flex flex-wrap items-center gap-3">
+
+                            <div className="font-black">
+                              {formatearFecha(
+                                entrega.fecha_entrega
+                              )}
+                            </div>
+
+                            <TipoEntregaBadge
+                              motivo={
+                                entrega.motivo
+                              }
+                            />
+
+                            {reposicion && (
+                              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
+                                {formatearTexto(
+                                  reposicion.motivo
+                                )}
+                              </span>
+                            )}
+
+                          </div>
+
+                          <div className="mt-2 text-sm text-neutral-600">
+                            {
+                              entrega
+                                .epp_ubicaciones
+                                ?.nombre
+                            }
+                          </div>
+
                         </div>
 
-                        <div className="mt-1 text-sm text-neutral-600">
-                          {
-                            entrega
-                              .epp_ubicaciones
-                              ?.nombre
-                          }{" "}
-                          ·{" "}
-                          {formatearTexto(
-                            entrega.motivo
-                          )}
-                        </div>
+                        <span className="w-fit rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
+                          {entrega.estado}
+                        </span>
 
                       </div>
 
-                      <span className="w-fit rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
-                        {entrega.estado}
-                      </span>
+                      <div className="mt-4 text-sm">
 
-                    </div>
+                        <span className="font-bold">
+                          Entregado por:
+                        </span>{" "}
+                        {
+                          entrega.entregado_por
+                        }
 
-                    <div className="mt-4 text-sm">
+                      </div>
 
-                      <span className="font-bold">
-                        Entregado por:
-                      </span>{" "}
-                      {
-                        entrega.entregado_por
-                      }
+                      <div className="mt-4 flex flex-wrap gap-2">
 
-                    </div>
+                        {(
+                          entrega.epp_entrega_detalle ??
+                          []
+                        ).map(
+                          (detalle) => (
+                            <span
+                              key={
+                                detalle.id
+                              }
+                              className="rounded-lg bg-neutral-100 px-3 py-2 text-xs font-semibold"
+                            >
+                              {
+                                detalle
+                                  .epp_catalogo
+                                  ?.nombre
+                              }{" "}
+                              ×{" "}
+                              {
+                                detalle.cantidad
+                              }
+                            </span>
+                          )
+                        )}
 
-                    <div className="mt-4 flex flex-wrap gap-2">
+                      </div>
 
-                      {(
-                        entrega.epp_entrega_detalle ??
-                        []
-                      ).map(
-                        (detalle) => (
-                          <span
-                            key={
-                              detalle.id
-                            }
-                            className="rounded-lg bg-neutral-100 px-3 py-2 text-xs font-semibold"
-                          >
-                            {
-                              detalle
-                                .epp_catalogo
-                                ?.nombre
-                            }{" "}
-                            ×{" "}
-                            {
-                              detalle.cantidad
-                            }
-                          </span>
-                        )
+                      {reposicion && (
+                        <div className="mt-4 rounded-xl border border-amber-200 bg-white p-4">
+
+                          <div className="text-xs font-black uppercase tracking-wide text-amber-800">
+                            Información de la reposición
+                          </div>
+
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+
+                            <div>
+                              <div className="text-xs text-neutral-500">
+                                Causa
+                              </div>
+
+                              <div className="mt-1 font-bold">
+                                {formatearTexto(
+                                  reposicion.motivo
+                                )}
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="text-xs text-neutral-500">
+                                Estado del EPP anterior
+                              </div>
+
+                              <div className="mt-1 font-bold">
+                                {
+                                  reposicion.estado_epp_anterior ||
+                                  "—"
+                                }
+                              </div>
+                            </div>
+
+                          </div>
+
+                          {reposicion.justificacion && (
+                            <div className="mt-3">
+
+                              <div className="text-xs text-neutral-500">
+                                Justificación
+                              </div>
+
+                              <div className="mt-1 text-sm">
+                                {
+                                  reposicion.justificacion
+                                }
+                              </div>
+
+                            </div>
+                          )}
+
+                        </div>
+                      )}
+
+                      {entrega.observaciones && (
+                        <div className="mt-4 rounded-xl bg-neutral-50 p-4 text-sm text-neutral-600">
+                          {
+                            entrega.observaciones
+                          }
+                        </div>
                       )}
 
                     </div>
-
-                    {entrega.observaciones && (
-                      <div className="mt-4 rounded-xl bg-neutral-50 p-4 text-sm text-neutral-600">
-                        {
-                          entrega.observaciones
-                        }
-                      </div>
-                    )}
-
-                  </div>
-                )
+                  );
+                }
               )}
 
             </div>
@@ -722,14 +918,28 @@ export default function FichaTrabajadorPage() {
 function Indicador({
   titulo,
   valor,
+  destacado = false,
 }: {
   titulo: string;
   valor: number;
+  destacado?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 p-5">
+    <div
+      className={`rounded-2xl border p-5 ${
+        destacado
+          ? "border-amber-200 bg-amber-50"
+          : "border-neutral-200"
+      }`}
+    >
 
-      <p className="text-sm text-neutral-500">
+      <p
+        className={`text-sm ${
+          destacado
+            ? "font-bold text-amber-800"
+            : "text-neutral-500"
+        }`}
+      >
         {titulo}
       </p>
 
@@ -782,6 +992,37 @@ function Talla({
       </p>
 
     </div>
+  );
+}
+
+function TipoEntregaBadge({
+  motivo,
+}: {
+  motivo: string | null;
+}) {
+  const normalizado =
+    motivo?.trim().toUpperCase();
+
+  if (normalizado === "REPOSICION") {
+    return (
+      <span className="inline-flex whitespace-nowrap rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
+        REPOSICIÓN
+      </span>
+    );
+  }
+
+  if (normalizado === "DOTACION") {
+    return (
+      <span className="inline-flex whitespace-nowrap rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-800">
+        DOTACIÓN
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex whitespace-nowrap rounded-full bg-neutral-100 px-3 py-1 text-xs font-black text-neutral-700">
+      {formatearTexto(motivo)}
+    </span>
   );
 }
 
