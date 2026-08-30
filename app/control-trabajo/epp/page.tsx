@@ -4,7 +4,7 @@ const modules = [
     description:
       "Indicadores de entregas, inventario, reposiciones y cumplimiento.",
     icon: "📊",
-    href: "#",
+    href: "/control-trabajo/epp/dashboard",
   },
   {
     title: "Entregar EPP",
