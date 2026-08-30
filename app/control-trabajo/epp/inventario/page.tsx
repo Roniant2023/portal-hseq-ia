@@ -257,12 +257,28 @@ export default function InventarioEppPage() {
             </p>
           </div>
 
-          <a
-            href="/control-trabajo/epp/entradas"
-            className="inline-flex items-center justify-center rounded-xl bg-neutral-950 px-5 py-3 font-bold text-white"
-          >
-            + Registrar entrada
-          </a>
+         <div className="flex flex-wrap gap-3">
+  <a
+    href="/control-trabajo/epp/entradas"
+    className="inline-flex items-center justify-center rounded-xl bg-neutral-950 px-5 py-3 font-bold text-white"
+  >
+    📥 Registrar entrada
+  </a>
+
+  <a
+    href="/control-trabajo/epp/movimientos"
+    className="inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-5 py-3 font-bold text-neutral-900 hover:bg-neutral-50"
+  >
+    📋 Kardex / Movimientos
+  </a>
+
+  <a
+    href="/control-trabajo/epp/catalogo"
+    className="inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-5 py-3 font-bold text-neutral-900 hover:bg-neutral-50"
+  >
+    🥽 Catálogo de EPP
+  </a>
+</div>
         </header>
 
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">

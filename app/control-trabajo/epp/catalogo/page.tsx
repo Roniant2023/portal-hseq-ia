@@ -330,11 +330,11 @@ export default function CatalogoEppPage() {
 
         <header>
           <a
-            href="/control-trabajo/epp"
-            className="text-sm text-neutral-600 hover:text-black"
-          >
-            ← Volver a Gestión de EPP
-          </a>
+  href="/control-trabajo/epp/inventario"
+  className="text-sm text-neutral-600 hover:text-black"
+>
+  ← Volver a Inventario
+</a>
 
           <h1 className="mt-4 text-4xl md:text-5xl font-black tracking-tight">
             Catálogo de EPP

@@ -343,11 +343,11 @@ export default function MovimientosEppPage() {
         <header className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <a
-              href="/control-trabajo/epp"
-              className="text-sm text-neutral-600 hover:text-black"
-            >
-              ← Volver a Gestión de EPP
-            </a>
+  href="/control-trabajo/epp/inventario"
+  className="text-sm text-neutral-600 hover:text-black"
+>
+  ← Volver a Inventario
+</a>
 
             <h1 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">
               Kardex de EPP
@@ -359,21 +359,7 @@ export default function MovimientosEppPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="/control-trabajo/epp/inventario"
-              className="rounded-xl border border-neutral-300 px-5 py-3 font-bold hover:bg-neutral-50"
-            >
-              Ver inventario
-            </a>
-
-            <a
-              href="/control-trabajo/epp/entradas"
-              className="rounded-xl bg-neutral-950 px-5 py-3 font-bold text-white"
-            >
-              + Registrar entrada
-            </a>
-          </div>
+          
         </header>
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-3">

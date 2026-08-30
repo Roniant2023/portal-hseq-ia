@@ -7,47 +7,25 @@ const modules = [
     href: "#",
   },
   {
-  title: "Entregar EPP",
-  description:
-    "Registrar la entrega de elementos de protección personal a trabajadores.",
-  icon: "🦺",
-  href: "/control-trabajo/epp/entregar",
-},
- {
-  title: "Trabajadores",
-  description:
-    "Consultar la dotación actual y el historial individual de cada trabajador.",
-  icon: "👷",
-  href: "/control-trabajo/epp/trabajadores",
-},
- {
-  title: "Inventario",
-  description:
-    "Controlar existencias, tallas, ubicaciones y movimientos de EPP.",
-  icon: "📦",
-  href: "/control-trabajo/epp/inventario",
-},
-
-{
-  title: "Registrar entrada",
-  description:
-    "Registrar nuevas existencias de EPP y actualizar el inventario por ubicación.",
-  icon: "📥",
-  href: "/control-trabajo/epp/entradas",
-},
-{
-  title: "Kardex / Movimientos",
-  description:
-    "Consultar entradas, entregas y trazabilidad de los movimientos de inventario.",
-  icon: "📋",
-  href: "/control-trabajo/epp/movimientos",
-},
-  {
-    title: "Catálogo de EPP",
+    title: "Entregar EPP",
     description:
-      "Administrar los elementos de protección personal disponibles.",
-    icon: "🥽",
-    href: "/control-trabajo/epp/catalogo",
+      "Registrar la entrega de elementos de protección personal a trabajadores.",
+    icon: "🦺",
+    href: "/control-trabajo/epp/entregar",
+  },
+  {
+    title: "Trabajadores",
+    description:
+      "Consultar la dotación actual y el historial individual de cada trabajador.",
+    icon: "👷",
+    href: "/control-trabajo/epp/trabajadores",
+  },
+  {
+    title: "Inventario",
+    description:
+      "Controlar existencias, entradas, catálogo y movimientos de EPP.",
+    icon: "📦",
+    href: "/control-trabajo/epp/inventario",
   },
   {
     title: "Reposiciones",
@@ -64,7 +42,6 @@ const modules = [
     href: "#",
   },
 ];
-
 export default function EppPage() {
   return (
     <main className="min-h-screen bg-white text-neutral-900">

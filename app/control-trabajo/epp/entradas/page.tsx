@@ -388,12 +388,12 @@ const itemsRpc = items.map((item) => ({
       <div className="mx-auto max-w-7xl space-y-8 px-6 py-10">
 
         <header>
-          <a
-            href="/control-trabajo/epp"
-            className="text-sm text-neutral-600 hover:text-black"
-          >
-            ← Volver a Gestión de EPP
-          </a>
+        <a
+  href="/control-trabajo/epp/inventario"
+  className="text-sm text-neutral-600 hover:text-black"
+>
+  ← Volver a Inventario
+</a>
 
           <h1 className="mt-4 text-4xl font-black tracking-tight md:text-5xl">
             Entradas de EPP
