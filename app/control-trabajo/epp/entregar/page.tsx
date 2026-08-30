@@ -20,6 +20,7 @@ type Ubicacion = {
   id: string;
   nombre: string;
 };
+
 type MatrizCargo = {
   cargo: string;
   epp_id: string;
@@ -27,6 +28,7 @@ type MatrizCargo = {
   cantidad_requerida: number;
   activo: boolean;
 };
+
 type Inventario = {
   id: string;
   epp_id: string;
@@ -82,15 +84,21 @@ export default function EntregarEppPage() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [ubicaciones, setUbicaciones] = useState<Ubicacion[]>([]);
   const [inventario, setInventario] = useState<Inventario[]>([]);
-const [matrizCargo, setMatrizCargo] = useState<MatrizCargo[]>([]);
+  const [matrizCargo, setMatrizCargo] = useState<MatrizCargo[]>([]);
+
   const [trabajadorId, setTrabajadorId] = useState("");
-const [busquedaTrabajador, setBusquedaTrabajador] = useState("");
-const [mostrarResultadosTrabajador, setMostrarResultadosTrabajador] =
-  useState(false);
+  const [busquedaTrabajador, setBusquedaTrabajador] = useState("");
+  const [mostrarResultadosTrabajador, setMostrarResultadosTrabajador] =
+    useState(false);
+
   const [ubicacionId, setUbicacionId] = useState("");
   const [entregadoPor, setEntregadoPor] = useState("");
   const [motivo, setMotivo] = useState("DOTACION");
   const [observaciones, setObservaciones] = useState("");
+
+  const [fechaEntrega, setFechaEntrega] = useState(
+    new Date().toLocaleDateString("en-CA")
+  );
 
   const [inventarioSeleccionado, setInventarioSeleccionado] =
     useState("");
@@ -111,11 +119,11 @@ const [mostrarResultadosTrabajador, setMostrarResultadosTrabajador] =
     setError("");
 
     const [
-  respuestaTrabajadores,
-  respuestaUbicaciones,
-  respuestaInventario,
-  respuestaMatrizCargo,
-] = await Promise.all([
+      respuestaTrabajadores,
+      respuestaUbicaciones,
+      respuestaInventario,
+      respuestaMatrizCargo,
+    ] = await Promise.all([
       supabase
         .from("epp_trabajadores")
         .select(`
@@ -162,7 +170,7 @@ const [mostrarResultadosTrabajador, setMostrarResultadosTrabajador] =
             nombre
           )
         `)
-               .gt("cantidad_disponible", 0)
+        .gt("cantidad_disponible", 0)
         .eq("estado", "DISPONIBLE")
         .order("created_at", { ascending: true }),
 
@@ -180,6 +188,7 @@ const [mostrarResultadosTrabajador, setMostrarResultadosTrabajador] =
 
     if (respuestaTrabajadores.error) {
       console.error(respuestaTrabajadores.error);
+
       setError(
         `No fue posible consultar trabajadores: ${respuestaTrabajadores.error.message}`
       );
@@ -191,6 +200,7 @@ const [mostrarResultadosTrabajador, setMostrarResultadosTrabajador] =
 
     if (respuestaUbicaciones.error) {
       console.error(respuestaUbicaciones.error);
+
       setError(
         `No fue posible consultar ubicaciones: ${respuestaUbicaciones.error.message}`
       );
@@ -202,6 +212,7 @@ const [mostrarResultadosTrabajador, setMostrarResultadosTrabajador] =
 
     if (respuestaInventario.error) {
       console.error(respuestaInventario.error);
+
       setError(
         `No fue posible consultar inventario: ${respuestaInventario.error.message}`
       );
@@ -210,108 +221,114 @@ const [mostrarResultadosTrabajador, setMostrarResultadosTrabajador] =
         (respuestaInventario.data ?? []) as unknown as Inventario[]
       );
     }
-if (respuestaMatrizCargo.error) {
-  console.error(respuestaMatrizCargo.error);
-  setError(
-    `No fue posible consultar la matriz de EPP por cargo: ${respuestaMatrizCargo.error.message}`
-  );
-} else {
-  setMatrizCargo(
-    (respuestaMatrizCargo.data ?? []) as MatrizCargo[]
-  );
-}
+
+    if (respuestaMatrizCargo.error) {
+      console.error(respuestaMatrizCargo.error);
+
+      setError(
+        `No fue posible consultar la matriz de EPP por cargo: ${respuestaMatrizCargo.error.message}`
+      );
+    } else {
+      setMatrizCargo(
+        (respuestaMatrizCargo.data ?? []) as MatrizCargo[]
+      );
+    }
+
     setCargando(false);
   }
 
   useEffect(() => {
     cargarDatos();
   }, []);
-const trabajadoresFiltrados = useMemo(() => {
-  const texto = busquedaTrabajador.trim().toLowerCase();
 
-  if (!texto) {
-  return [];
-}
+  const trabajadoresFiltrados = useMemo(() => {
+    const texto = busquedaTrabajador.trim().toLowerCase();
 
-  return trabajadores
-    .filter((trabajador) => {
+    if (!texto) {
+      return [];
+    }
+
+    return trabajadores
+      .filter((trabajador) => {
+        const contenido = [
+          trabajador.identificacion,
+          trabajador.nombres,
+          trabajador.apellidos,
+          `${trabajador.nombres} ${trabajador.apellidos}`,
+          trabajador.cargo,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return contenido.includes(texto);
+      })
+      .slice(0, 10);
+  }, [trabajadores, busquedaTrabajador]);
+
+  const trabajadorSeleccionado = trabajadores.find(
+    (trabajador) => trabajador.id === trabajadorId
+  );
+
+  const inventarioDisponible = useMemo(() => {
+    if (!ubicacionId || !trabajadorSeleccionado?.cargo) {
+      return [];
+    }
+
+    const cargoTrabajador = trabajadorSeleccionado.cargo
+      .trim()
+      .toUpperCase();
+
+    const eppPermitidos = new Set(
+      matrizCargo
+        .filter(
+          (registro) =>
+            registro.cargo.trim().toUpperCase() === cargoTrabajador &&
+            registro.activo
+        )
+        .map((registro) => registro.epp_id)
+    );
+
+    const texto = busquedaInventario.trim().toLowerCase();
+
+    return inventario.filter((registro) => {
+      if (registro.ubicacion_id !== ubicacionId) {
+        return false;
+      }
+
+      if (registro.cantidad_disponible <= 0) {
+        return false;
+      }
+
+      if (!eppPermitidos.has(registro.epp_id)) {
+        return false;
+      }
+
+      if (!texto) {
+        return true;
+      }
+
       const contenido = [
-        trabajador.identificacion,
-        trabajador.nombres,
-        trabajador.apellidos,
-        `${trabajador.nombres} ${trabajador.apellidos}`,
-        trabajador.cargo,
+        registro.epp_catalogo?.codigo,
+        registro.epp_catalogo?.nombre,
+        registro.talla,
+        registro.lote,
+        registro.serial,
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
       return contenido.includes(texto);
-    })
-    .slice(0, 10);
-}, [trabajadores, busquedaTrabajador]);
-  const trabajadorSeleccionado = trabajadores.find(
-    (trabajador) => trabajador.id === trabajadorId
-  );
+    });
+  }, [
+    inventario,
+    ubicacionId,
+    busquedaInventario,
+    trabajadorSeleccionado?.cargo,
+    matrizCargo,
+  ]);
 
-  const inventarioDisponible = useMemo(() => {
-  if (!ubicacionId || !trabajadorSeleccionado?.cargo) {
-    return [];
-  }
-
-  const cargoTrabajador = trabajadorSeleccionado.cargo
-    .trim()
-    .toUpperCase();
-
-  const eppPermitidos = new Set(
-    matrizCargo
-      .filter(
-        (registro) =>
-          registro.cargo.trim().toUpperCase() === cargoTrabajador &&
-          registro.activo
-      )
-      .map((registro) => registro.epp_id)
-  );
-
-  const texto = busquedaInventario.trim().toLowerCase();
-
-  return inventario.filter((registro) => {
-    if (registro.ubicacion_id !== ubicacionId) {
-      return false;
-    }
-
-    if (registro.cantidad_disponible <= 0) {
-      return false;
-    }
-
-    if (!eppPermitidos.has(registro.epp_id)) {
-      return false;
-    }
-
-    if (!texto) {
-      return true;
-    }
-
-    const contenido = [
-      registro.epp_catalogo?.codigo,
-      registro.epp_catalogo?.nombre,
-      registro.talla,
-      registro.lote,
-      registro.serial,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-
-    return contenido.includes(texto);
-  });
-}, [
-  inventario,
-  ubicacionId,
-  busquedaInventario,
-  trabajadorSeleccionado?.cargo,
-  matrizCargo,
-]);
   const registroSeleccionado = inventario.find(
     (registro) => registro.id === inventarioSeleccionado
   );
@@ -409,6 +426,11 @@ const trabajadoresFiltrados = useMemo(() => {
       return;
     }
 
+    if (!fechaEntrega) {
+      setError("Selecciona la fecha de entrega.");
+      return;
+    }
+
     if (!entregadoPor.trim()) {
       setError(
         "Debes indicar el nombre de quien realiza la entrega."
@@ -430,18 +452,19 @@ const trabajadoresFiltrados = useMemo(() => {
       cantidad: item.cantidad,
     }));
 
-    const { data, error: errorRpc } = await supabase.rpc(
-      "registrar_entrega_epp",
-      {
-        p_trabajador_id: trabajadorId,
-        p_ubicacion_id: ubicacionId,
-        p_entregado_por: entregadoPor.trim(),
-        p_motivo: motivo,
-        p_observaciones:
-          observaciones.trim() || null,
-        p_items: itemsRpc,
-      }
-    );
+  const { data, error: errorRpc } = await supabase.rpc(
+  "registrar_entrega_epp",
+  {
+    p_trabajador_id: trabajadorId,
+    p_ubicacion_id: ubicacionId,
+    p_entregado_por: entregadoPor.trim(),
+    p_motivo: motivo,
+    p_observaciones:
+      observaciones.trim() || null,
+    p_items: itemsRpc,
+    p_fecha_entrega: fechaEntrega,
+  }
+);
 
     if (errorRpc) {
       console.error(errorRpc);
@@ -504,70 +527,90 @@ const trabajadoresFiltrados = useMemo(() => {
 
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
 
-               <div className="relative">
-  <Etiqueta texto="Trabajador *" />
+                <div className="relative">
+                  <Etiqueta texto="Trabajador *" />
 
-  <input
-    type="search"
-    value={busquedaTrabajador}
-    onChange={(e) => {
-      setBusquedaTrabajador(e.target.value);
-      setMostrarResultadosTrabajador(true);
+                  <input
+                    type="search"
+                    value={busquedaTrabajador}
+                    onChange={(e) => {
+                      setBusquedaTrabajador(e.target.value);
+                      setMostrarResultadosTrabajador(true);
 
-      if (trabajadorId) {
-        setTrabajadorId("");
-        setInventarioSeleccionado("");
-        setItems([]);
-        setBusquedaInventario("");
-        setCantidad("1");
-      }
-    }}
-    onFocus={() => setMostrarResultadosTrabajador(true)}
-    placeholder="Buscar por nombre, apellido o cédula..."
-    autoComplete="off"
-    className="w-full rounded-xl border border-neutral-300 px-4 py-3"
-  />
+                      if (trabajadorId) {
+                        setTrabajadorId("");
+                        setInventarioSeleccionado("");
+                        setItems([]);
+                        setBusquedaInventario("");
+                        setCantidad("1");
+                      }
+                    }}
+                    onFocus={() =>
+                      setMostrarResultadosTrabajador(true)
+                    }
+                    placeholder="Buscar por nombre, apellido o cédula..."
+                    autoComplete="off"
+                    className="w-full rounded-xl border border-neutral-300 px-4 py-3"
+                  />
 
-  {mostrarResultadosTrabajador && (
-    <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-xl">
-      {trabajadoresFiltrados.length > 0 ? (
-        trabajadoresFiltrados.map((trabajador) => (
-          <button
-            key={trabajador.id}
-            type="button"
-            onClick={() => {
-              setTrabajadorId(trabajador.id);
+                  {mostrarResultadosTrabajador && (
+                    <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-xl">
 
-              setBusquedaTrabajador(
-                `${trabajador.nombres} ${trabajador.apellidos} - ${trabajador.identificacion}`
-              );
+                      {trabajadoresFiltrados.length > 0 ? (
+                        trabajadoresFiltrados.map(
+                          (trabajador) => (
+                            <button
+                              key={trabajador.id}
+                              type="button"
+                              onClick={() => {
+                                setTrabajadorId(
+                                  trabajador.id
+                                );
 
-              setMostrarResultadosTrabajador(false);
-              setInventarioSeleccionado("");
-              setItems([]);
-              setBusquedaInventario("");
-              setCantidad("1");
-            }}
-            className="block w-full border-b border-neutral-100 px-4 py-3 text-left last:border-b-0 hover:bg-neutral-50"
-          >
-            <div className="font-bold text-neutral-900">
-              {trabajador.nombres} {trabajador.apellidos}
-            </div>
+                                setBusquedaTrabajador(
+                                  `${trabajador.nombres} ${trabajador.apellidos} - ${trabajador.identificacion}`
+                                );
 
-            <div className="mt-1 text-sm text-neutral-500">
-              CC {trabajador.identificacion}
-              {trabajador.cargo ? ` · ${trabajador.cargo}` : ""}
-            </div>
-          </button>
-        ))
-      ) : (
-        <div className="px-4 py-4 text-sm text-neutral-500">
-          No se encontraron trabajadores.
-        </div>
-      )}
-    </div>
-  )}
-</div>
+                                setMostrarResultadosTrabajador(
+                                  false
+                                );
+
+                                setInventarioSeleccionado(
+                                  ""
+                                );
+
+                                setItems([]);
+                                setBusquedaInventario("");
+                                setCantidad("1");
+                              }}
+                              className="block w-full border-b border-neutral-100 px-4 py-3 text-left last:border-b-0 hover:bg-neutral-50"
+                            >
+                              <div className="font-bold text-neutral-900">
+                                {trabajador.nombres}{" "}
+                                {trabajador.apellidos}
+                              </div>
+
+                              <div className="mt-1 text-sm text-neutral-500">
+                                CC{" "}
+                                {
+                                  trabajador.identificacion
+                                }
+                                {trabajador.cargo
+                                  ? ` · ${trabajador.cargo}`
+                                  : ""}
+                              </div>
+                            </button>
+                          )
+                        )
+                      ) : (
+                        <div className="px-4 py-4 text-sm text-neutral-500">
+                          No se encontraron trabajadores.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <Etiqueta texto="Lugar de entrega *" />
 
@@ -627,6 +670,19 @@ const trabajadoresFiltrados = useMemo(() => {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <Etiqueta texto="Fecha de entrega *" />
+
+                  <input
+                    type="date"
+                    value={fechaEntrega}
+                    onChange={(e) =>
+                      setFechaEntrega(e.target.value)
+                    }
+                    className="w-full rounded-xl border border-neutral-300 px-4 py-3"
+                  />
                 </div>
 
               </div>
@@ -731,17 +787,28 @@ const trabajadoresFiltrados = useMemo(() => {
                               key={registro.id}
                               value={registro.id}
                             >
-                              {registro.epp_catalogo?.codigo} -{" "}
-                              {registro.epp_catalogo?.nombre}
+                              {
+                                registro.epp_catalogo
+                                  ?.codigo
+                              }{" "}
+                              -{" "}
+                              {
+                                registro.epp_catalogo
+                                  ?.nombre
+                              }
+
                               {registro.talla
                                 ? ` | Talla ${registro.talla}`
                                 : ""}
+
                               {registro.lote
                                 ? ` | Lote ${registro.lote}`
                                 : ""}
+
                               {registro.serial
                                 ? ` | Serial ${registro.serial}`
                                 : ""}
+
                               {` | Disponible: ${registro.cantidad_disponible}`}
                             </option>
                           )
@@ -810,21 +877,27 @@ const trabajadoresFiltrados = useMemo(() => {
                         <th className="py-3 pr-4">
                           Código
                         </th>
+
                         <th className="py-3 pr-4">
                           EPP
                         </th>
+
                         <th className="py-3 pr-4">
                           Talla
                         </th>
+
                         <th className="py-3 pr-4">
                           Lote
                         </th>
+
                         <th className="py-3 pr-4">
                           Serial
                         </th>
+
                         <th className="py-3 pr-4">
                           Cantidad
                         </th>
+
                         <th className="py-3">
                           Acción
                         </th>
