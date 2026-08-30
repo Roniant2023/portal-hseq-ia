@@ -662,7 +662,7 @@ function EstadoBadge({
     VIGENTE: "bg-green-100 text-green-800",
   };
 
-  let texto = estado;
+  let texto: string = estado;
 
   if (estado === "PRÓXIMO" && dias !== null) {
     texto = `PRÓXIMO · ${dias} días`;
