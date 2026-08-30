@@ -84,6 +84,9 @@ export default function EntregarEppPage() {
   const [inventario, setInventario] = useState<Inventario[]>([]);
 const [matrizCargo, setMatrizCargo] = useState<MatrizCargo[]>([]);
   const [trabajadorId, setTrabajadorId] = useState("");
+const [busquedaTrabajador, setBusquedaTrabajador] = useState("");
+const [mostrarResultadosTrabajador, setMostrarResultadosTrabajador] =
+  useState(false);
   const [ubicacionId, setUbicacionId] = useState("");
   const [entregadoPor, setEntregadoPor] = useState("");
   const [motivo, setMotivo] = useState("DOTACION");
@@ -223,7 +226,30 @@ if (respuestaMatrizCargo.error) {
   useEffect(() => {
     cargarDatos();
   }, []);
+const trabajadoresFiltrados = useMemo(() => {
+  const texto = busquedaTrabajador.trim().toLowerCase();
 
+  if (!texto) {
+  return [];
+}
+
+  return trabajadores
+    .filter((trabajador) => {
+      const contenido = [
+        trabajador.identificacion,
+        trabajador.nombres,
+        trabajador.apellidos,
+        `${trabajador.nombres} ${trabajador.apellidos}`,
+        trabajador.cargo,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return contenido.includes(texto);
+    })
+    .slice(0, 10);
+}, [trabajadores, busquedaTrabajador]);
   const trabajadorSeleccionado = trabajadores.find(
     (trabajador) => trabajador.id === trabajadorId
   );
@@ -478,38 +504,70 @@ if (respuestaMatrizCargo.error) {
 
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
 
-                <div>
-                  <Etiqueta texto="Trabajador *" />
+               <div className="relative">
+  <Etiqueta texto="Trabajador *" />
 
-                  <select
-                   
-  value={trabajadorId}
-  onChange={(e) => {
-    setTrabajadorId(e.target.value);
-    setInventarioSeleccionado("");
-    setItems([]);
-    setBusquedaInventario("");
-    setCantidad("1");
-  }}
-                    className="w-full rounded-xl border border-neutral-300 px-4 py-3"
-                  >
-                    <option value="">
-                      Seleccionar trabajador...
-                    </option>
+  <input
+    type="search"
+    value={busquedaTrabajador}
+    onChange={(e) => {
+      setBusquedaTrabajador(e.target.value);
+      setMostrarResultadosTrabajador(true);
 
-                    {trabajadores.map((trabajador) => (
-                      <option
-                        key={trabajador.id}
-                        value={trabajador.id}
-                      >
-                        {trabajador.identificacion} -{" "}
-                        {trabajador.nombres}{" "}
-                        {trabajador.apellidos}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+      if (trabajadorId) {
+        setTrabajadorId("");
+        setInventarioSeleccionado("");
+        setItems([]);
+        setBusquedaInventario("");
+        setCantidad("1");
+      }
+    }}
+    onFocus={() => setMostrarResultadosTrabajador(true)}
+    placeholder="Buscar por nombre, apellido o cédula..."
+    autoComplete="off"
+    className="w-full rounded-xl border border-neutral-300 px-4 py-3"
+  />
 
+  {mostrarResultadosTrabajador && (
+    <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-xl">
+      {trabajadoresFiltrados.length > 0 ? (
+        trabajadoresFiltrados.map((trabajador) => (
+          <button
+            key={trabajador.id}
+            type="button"
+            onClick={() => {
+              setTrabajadorId(trabajador.id);
+
+              setBusquedaTrabajador(
+                `${trabajador.nombres} ${trabajador.apellidos} - ${trabajador.identificacion}`
+              );
+
+              setMostrarResultadosTrabajador(false);
+              setInventarioSeleccionado("");
+              setItems([]);
+              setBusquedaInventario("");
+              setCantidad("1");
+            }}
+            className="block w-full border-b border-neutral-100 px-4 py-3 text-left last:border-b-0 hover:bg-neutral-50"
+          >
+            <div className="font-bold text-neutral-900">
+              {trabajador.nombres} {trabajador.apellidos}
+            </div>
+
+            <div className="mt-1 text-sm text-neutral-500">
+              CC {trabajador.identificacion}
+              {trabajador.cargo ? ` · ${trabajador.cargo}` : ""}
+            </div>
+          </button>
+        ))
+      ) : (
+        <div className="px-4 py-4 text-sm text-neutral-500">
+          No se encontraron trabajadores.
+        </div>
+      )}
+    </div>
+  )}
+</div>
                 <div>
                   <Etiqueta texto="Lugar de entrega *" />
 
