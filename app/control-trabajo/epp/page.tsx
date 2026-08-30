@@ -27,6 +27,21 @@ const modules = [
   icon: "📦",
   href: "/control-trabajo/epp/inventario",
 },
+
+{
+  title: "Registrar entrada",
+  description:
+    "Registrar nuevas existencias de EPP y actualizar el inventario por ubicación.",
+  icon: "📥",
+  href: "/control-trabajo/epp/entradas",
+},
+{
+  title: "Kardex / Movimientos",
+  description:
+    "Consultar entradas, entregas y trazabilidad de los movimientos de inventario.",
+  icon: "📋",
+  href: "/control-trabajo/epp/movimientos",
+},
   {
     title: "Catálogo de EPP",
     description:
