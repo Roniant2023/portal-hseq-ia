@@ -1,11 +1,12 @@
 import Image from "next/image";
+import UserSessionBar from "./components/UserSessionBar";
 
 const programs = [
   {
     title: "Control de Trabajo",
     icon: "/icons/control-trabajo.png",
     href: "/control-trabajo",
-external: false,
+    external: false,
   },
   {
     title: "Trabajo en Alturas",
@@ -20,11 +21,11 @@ external: false,
     external: false,
   },
   {
-  title: "Ambiental",
-  icon: "/icons/ambiental.png",
-  href: "/ambiental",
-  external: false,
-},
+    title: "Ambiental",
+    icon: "/icons/ambiental.png",
+    href: "/ambiental",
+    external: false,
+  },
   {
     title: "Seguridad Vial",
     icon: "/icons/seguridad-vial.png",
@@ -44,9 +45,15 @@ export default function Home() {
     <main className="min-h-screen bg-white text-neutral-900">
       <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
         <header className="flex items-center justify-between gap-4 flex-wrap">
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-neutral-950">
-            Portal HSEQ IA
-          </h1>
+          <div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-neutral-950">
+              Portal HSEQ IA
+            </h1>
+
+            <div className="mt-3">
+              <UserSessionBar />
+            </div>
+          </div>
 
           <Image
             src="/logo-eies.png"

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ServiceWorkerRegister from "./ServiceWorkerRegister";
+import AuthGate from "./components/AuthGate";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -39,7 +40,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ServiceWorkerRegister />
-        {children}
+
+        <AuthGate>
+          {children}
+        </AuthGate>
       </body>
     </html>
   );
