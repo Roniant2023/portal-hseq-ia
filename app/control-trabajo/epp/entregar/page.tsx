@@ -957,20 +957,27 @@ cargarEppEntregadosAnteriormente(trabajador.id);
   >
     <option value="">Seleccionar EPP entregado anteriormente...</option>
 
-    {eppEntregadosAnteriormente.map((eppAnterior) => (
-      <option
-        key={eppAnterior.id}
-        value={eppAnterior.id}
-      >{eppAnterior.epp_catalogo?.[0]?.codigo || "EPP"} -{" "}
-{eppAnterior.epp_catalogo?.[0]?.nombre || "Sin nombre"}
-        {eppAnterior.talla
-          ? ` | Talla ${eppAnterior.talla}`
-          : ""}
-        {eppAnterior.fecha_entrega
-          ? ` | Entregado: ${eppAnterior.fecha_entrega}`
-          : ""}
-      </option>
-    ))}
+ {eppEntregadosAnteriormente.map((eppAnterior) => {
+  const catalogoEpp = inventario.find(
+    (registro) => registro.epp_id === eppAnterior.epp_id
+  )?.epp_catalogo;
+
+  return (
+    <option
+      key={eppAnterior.id}
+      value={eppAnterior.id}
+    >
+      {catalogoEpp?.codigo || "EPP"} -{" "}
+      {catalogoEpp?.nombre || "Sin nombre"}
+      {eppAnterior.talla
+        ? ` | Talla ${eppAnterior.talla}`
+        : ""}
+      {eppAnterior.fecha_entrega
+        ? ` | Entregado: ${eppAnterior.fecha_entrega}`
+        : ""}
+    </option>
+  );
+})}
   </select>
 
   {trabajadorId && eppEntregadosAnteriormente.length === 0 && (
