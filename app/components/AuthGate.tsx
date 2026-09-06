@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+type PerfilPortal = {
+  nombre: string | null;
+  rol: string | null;
+  activo: boolean | null;
+};
+
 export default function AuthGate({
   children,
 }: {
@@ -12,9 +18,15 @@ export default function AuthGate({
   const pathname = usePathname();
   const router = useRouter();
 
-  const esRutaPublica = pathname === "/login";
+  const esRutaPublica = [
+  "/login",
+  "/recuperar-password",
+  "/actualizar-password",
+].includes(pathname);
 
-  const [verificando, setVerificando] = useState(!esRutaPublica);
+  const [verificando, setVerificando] = useState(
+    !esRutaPublica
+  );
   const [autenticado, setAutenticado] = useState(false);
 
   useEffect(() => {
@@ -24,46 +36,91 @@ export default function AuthGate({
       return;
     }
 
-    // Cada vez que cambia la ruta protegida,
-    // volvemos a comprobar la sesión.
-    setVerificando(true);
-    setAutenticado(false);
-
     let montado = true;
 
-    async function verificar() {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
+    async function verificarAcceso() {
+      setVerificando(true);
+      setAutenticado(false);
 
-      if (!montado) return;
+      try {
+        // 1. Comprobar sesión de Supabase
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-      if (error || !session) {
+        if (!montado) return;
+
+        if (sessionError || !session) {
+          setVerificando(false);
+          router.replace("/login");
+          return;
+        }
+
+        // 2. Consultar el perfil real del usuario
+        const { data, error: perfilError } =
+          await supabase.rpc("mi_perfil_portal");
+
+        if (!montado) return;
+
+        if (
+          perfilError ||
+          !data ||
+          data.length === 0
+        ) {
+          await supabase.auth.signOut();
+
+          if (!montado) return;
+
+          setVerificando(false);
+          router.replace("/login?estado=sin_perfil");
+          return;
+        }
+
+        const perfil = data[0] as PerfilPortal;
+
+        // 3. Bloquear usuarios inactivos
+        if (perfil.activo !== true) {
+          await supabase.auth.signOut();
+
+          if (!montado) return;
+
+          setAutenticado(false);
+          setVerificando(false);
+
+          router.replace("/login?estado=inactivo");
+          return;
+        }
+
+        // 4. Usuario autenticado y activo
+        setAutenticado(true);
+        setVerificando(false);
+      } catch (error) {
+        console.error(
+          "Error verificando acceso al Portal HSEQ:",
+          error
+        );
+
+        if (!montado) return;
+
         setAutenticado(false);
         setVerificando(false);
-        router.replace("/login");
-        return;
-      }
 
-      setAutenticado(true);
-      setVerificando(false);
+        router.replace("/login");
+      }
     }
 
-    verificar();
+    verificarAcceso();
 
     return () => {
       montado = false;
     };
   }, [pathname, esRutaPublica, router]);
 
-  // /login siempre puede mostrarse.
   if (esRutaPublica) {
     return <>{children}</>;
   }
 
-  // Nunca mostramos el contenido protegido mientras
-  // Supabase está comprobando la sesión.
   if (verificando) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-neutral-50">
@@ -74,8 +131,6 @@ export default function AuthGate({
     );
   }
 
-  // Sin sesión no renderizamos absolutamente nada
-  // mientras Next.js redirige al login.
   if (!autenticado) {
     return null;
   }

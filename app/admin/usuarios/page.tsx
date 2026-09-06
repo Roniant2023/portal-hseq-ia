@@ -69,7 +69,6 @@ export default function AdministracionUsuariosPage() {
   return (
     <main className="min-h-screen bg-neutral-50 p-6 md:p-10">
       <div className="mx-auto max-w-6xl">
-
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="text-sm font-bold uppercase tracking-wider text-green-700">
@@ -85,12 +84,23 @@ export default function AdministracionUsuariosPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => router.push("/")}
-            className="rounded-xl border border-neutral-300 bg-white px-5 py-3 font-bold text-neutral-700"
-          >
-            ← Volver al Portal
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() =>
+                router.push("/admin/usuarios/nuevo")
+              }
+              className="rounded-xl bg-green-700 px-5 py-3 font-bold text-white transition hover:bg-green-800"
+            >
+              + Crear usuario
+            </button>
+
+            <button
+              onClick={() => router.push("/")}
+              className="rounded-xl border border-neutral-300 bg-white px-5 py-3 font-bold text-neutral-700 transition hover:bg-neutral-100"
+            >
+              ← Volver al Portal
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -108,13 +118,28 @@ export default function AdministracionUsuariosPage() {
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm">
-              <table className="w-full min-w-[760px] text-left">
+              <table className="w-full min-w-[1050px] text-left">
                 <thead className="bg-neutral-100 text-sm text-neutral-600">
                   <tr>
-                    <th className="px-5 py-4">Nombre</th>
-                    <th className="px-5 py-4">Correo</th>
-                    <th className="px-5 py-4">Rol</th>
-                    <th className="px-5 py-4">Estado</th>
+                    <th className="px-5 py-4">
+                      Nombre
+                    </th>
+
+                    <th className="px-5 py-4">
+                      Correo
+                    </th>
+
+                    <th className="px-5 py-4">
+                      Rol
+                    </th>
+
+                    <th className="px-5 py-4">
+                      Estado
+                    </th>
+
+                    <th className="px-5 py-4 text-right">
+                      Acciones
+                    </th>
                   </tr>
                 </thead>
 
@@ -154,6 +179,32 @@ export default function AdministracionUsuariosPage() {
                             Inactivo
                           </span>
                         )}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() =>
+                              router.push(
+                                `/admin/usuarios/${usuario.id}/editar`
+                              )
+                            }
+                            className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-bold text-neutral-700 transition hover:bg-neutral-100"
+                          >
+                            Editar usuario
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              router.push(
+                                `/admin/usuarios/${usuario.id}/permisos`
+                              )
+                            }
+                            className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-bold text-neutral-700 transition hover:bg-neutral-950 hover:text-white"
+                          >
+                            Gestionar permisos
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

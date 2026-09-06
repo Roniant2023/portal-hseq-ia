@@ -1,3 +1,11 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+
+
+
 const modules = [
   {
     title: "Dashboard EPP",
@@ -43,6 +51,83 @@ const modules = [
   },
 ];
 export default function EppPage() {
+  const router = useRouter();
+
+  const [verificando, setVerificando] = useState(true);
+  const [puedeVer, setPuedeVer] = useState(false);
+
+  useEffect(() => {
+    let activo = true;
+
+    async function validarAcceso() {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!activo) return;
+
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
+
+        const { data, error } = await supabase.rpc(
+          "puede_acceder_modulo",
+          {
+            p_user_id: user.id,
+            p_modulo: "EPP",
+          }
+        );
+
+        if (!activo) return;
+
+        if (error) {
+          console.error("Error validando acceso a EPP:", error);
+          router.replace("/");
+          return;
+        }
+
+        if (data !== true) {
+          router.replace("/");
+          return;
+        }
+
+        setPuedeVer(true);
+      } catch (err) {
+        console.error("Error validando acceso a EPP:", err);
+
+        if (activo) {
+          router.replace("/");
+        }
+      } finally {
+        if (activo) {
+          setVerificando(false);
+        }
+      }
+    }
+
+    validarAcceso();
+
+    return () => {
+      activo = false;
+    };
+  }, [router]);
+
+  if (verificando) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-white">
+        <p className="font-semibold text-neutral-600">
+          Validando acceso...
+        </p>
+      </main>
+    );
+  }
+
+  if (!puedeVer) {
+    return null;
+  }
+
   return (
     <main className="min-h-screen bg-white text-neutral-900">
       <div className="max-w-6xl mx-auto px-6 py-10 space-y-8">

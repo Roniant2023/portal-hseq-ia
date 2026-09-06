@@ -27,7 +27,9 @@ export default function UserSessionBar() {
 
       setEmail(session.user.email ?? "");
 
-      const { data, error } = await supabase.rpc("mi_perfil_portal");
+      const { data, error } = await supabase.rpc(
+        "mi_perfil_portal"
+      );
 
       if (error) {
         console.error("Error cargando perfil:", error);
@@ -56,7 +58,7 @@ export default function UserSessionBar() {
   }
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-wrap items-center gap-3">
       <div className="text-right">
         <div className="text-sm font-bold text-neutral-900">
           {perfil?.nombre || email}
@@ -68,6 +70,15 @@ export default function UserSessionBar() {
       </div>
 
       <button
+        type="button"
+        onClick={() => router.push("/cuenta/password")}
+        className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-bold text-neutral-700 transition hover:bg-neutral-100"
+      >
+        Cambiar contraseña
+      </button>
+
+      <button
+        type="button"
         onClick={cerrarSesion}
         disabled={cerrando}
         className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-bold text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-60"

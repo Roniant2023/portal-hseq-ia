@@ -40,6 +40,7 @@ type DetalleEntrega = {
     codigo: string;
     nombre: string;
     categoria: string;
+    requiere_aprobacion_reposicion: boolean;
   } | null;
 };
 
@@ -54,6 +55,7 @@ type EntregaDisponible = {
   serial: string | null;
   codigo: string;
   nombre: string;
+requiere_aprobacion_reposicion: boolean;
 };
 
 type Inventario = {
@@ -181,6 +183,9 @@ export default function ReposicionesEppPage() {
 
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
+
+const [puedeAprobarReposiciones, setPuedeAprobarReposiciones] =
+  useState(false);
 
   // =========================================================
   // HISTORIAL
@@ -457,6 +462,48 @@ export default function ReposicionesEppPage() {
     cargarHistorialReposiciones();
   }, []);
 
+useEffect(() => {
+  async function validarPermisoAprobacion() {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setPuedeAprobarReposiciones(false);
+        return;
+      }
+
+      const { data, error } = await supabase.rpc(
+        "puede_aprobar_reposiciones_epp",
+        {
+          p_user_id: user.id,
+        }
+      );
+
+      if (error) {
+        console.error(
+          "Error validando permiso de aprobación:",
+          error
+        );
+
+        setPuedeAprobarReposiciones(false);
+        return;
+      }
+
+      setPuedeAprobarReposiciones(data === true);
+    } catch (err) {
+      console.error(
+        "Error inesperado validando permiso de aprobación:",
+        err
+      );
+
+      setPuedeAprobarReposiciones(false);
+    }
+  }
+
+  validarPermisoAprobacion();
+}, []);
   // =========================================================
   // BUSCADOR DE TRABAJADORES
   // =========================================================
@@ -575,10 +622,11 @@ export default function ReposicionesEppPage() {
           lote,
           serial,
           epp_catalogo (
-            codigo,
-            nombre,
-            categoria
-          )
+  codigo,
+  nombre,
+  categoria,
+  requiere_aprobacion_reposicion
+)
         `)
         .in("entrega_id", idsEntregas);
 
@@ -604,17 +652,19 @@ export default function ReposicionesEppPage() {
       if (!entrega) continue;
 
       registros.push({
-        detalle_id: detalle.id,
-        entrega_id: detalle.entrega_id,
-        epp_id: detalle.epp_id,
-        fecha_entrega: entrega.fecha_entrega,
-        cantidad_original: detalle.cantidad,
-        talla: detalle.talla,
-        lote: detalle.lote,
-        serial: detalle.serial,
-        codigo: detalle.epp_catalogo?.codigo || "",
-        nombre: detalle.epp_catalogo?.nombre || "EPP",
-      });
+  detalle_id: detalle.id,
+  entrega_id: detalle.entrega_id,
+  epp_id: detalle.epp_id,
+  fecha_entrega: entrega.fecha_entrega,
+  cantidad_original: detalle.cantidad,
+  talla: detalle.talla,
+  lote: detalle.lote,
+  serial: detalle.serial,
+  codigo: detalle.epp_catalogo?.codigo || "",
+  nombre: detalle.epp_catalogo?.nombre || "EPP",
+  requiere_aprobacion_reposicion:
+    detalle.epp_catalogo?.requiere_aprobacion_reposicion ?? false,
+});
     }
 
     registros.sort(
@@ -651,111 +701,140 @@ export default function ReposicionesEppPage() {
   // =========================================================
 
   async function guardarReposicion() {
-    setMensaje("");
-    setError("");
+  setMensaje("");
+  setError("");
 
-    if (!trabajadorId) {
-      setError("Selecciona el trabajador.");
-      return;
-    }
+  if (!trabajadorId) {
+    setError("Selecciona el trabajador.");
+    return;
+  }
 
-    if (!entregaSeleccionada) {
-      setError("Selecciona el EPP de la entrega original.");
-      return;
-    }
+  if (!entregaSeleccionada) {
+    setError("Selecciona el EPP de la entrega original.");
+    return;
+  }
 
-    if (!ubicacionId) {
-      setError("Selecciona la ubicación de la reposición.");
-      return;
-    }
+  if (!ubicacionId) {
+    setError("Selecciona la ubicación de la reposición.");
+    return;
+  }
 
-    if (!inventarioId) {
-      setError("Selecciona el nuevo EPP del inventario.");
-      return;
-    }
+  if (!inventarioId) {
+    setError("Selecciona el nuevo EPP del inventario.");
+    return;
+  }
 
-    if (
-      !Number.isInteger(cantidadNumero) ||
-      cantidadNumero <= 0
-    ) {
-      setError(
-        "La cantidad debe ser un número entero mayor que cero."
+  if (!Number.isInteger(cantidadNumero) || cantidadNumero <= 0) {
+    setError("La cantidad debe ser un número entero mayor que cero.");
+    return;
+  }
+
+  if (
+    inventarioSeleccionado &&
+    cantidadNumero > inventarioSeleccionado.cantidad_disponible
+  ) {
+    setError(
+      `Existencia insuficiente. Disponible: ${inventarioSeleccionado.cantidad_disponible}.`
+    );
+    return;
+  }
+
+  if (!fechaEntrega) {
+    setError("Selecciona la fecha de reposición.");
+    return;
+  }
+
+  if (!entregadoPor.trim()) {
+    setError("Debes indicar quién realiza la reposición.");
+    return;
+  }
+
+  if (!justificacion.trim()) {
+    setError("Debes registrar la justificación de la reposición.");
+    return;
+  }
+
+  setGuardando(true);
+
+  try {
+    const requiereAprobacion =
+      entregaSeleccionada.requiere_aprobacion_reposicion === true;
+
+    // =====================================================
+    // EPP QUE REQUIERE APROBACIÓN
+    // =====================================================
+
+    if (requiereAprobacion) {
+      const { data, error: errorRpc } = await supabase.rpc(
+        "solicitar_reposicion_epp",
+        {
+          p_trabajador_id: trabajadorId,
+          p_epp_id: entregaSeleccionada.epp_id,
+          p_entrega_original_id: entregaSeleccionada.entrega_id,
+          p_inventario_id: inventarioId,
+          p_ubicacion_id: ubicacionId,
+          p_cantidad: cantidadNumero,
+          p_motivo: motivo,
+          p_estado_epp_anterior: estadoAnterior.trim() || null,
+          p_justificacion: justificacion.trim(),
+          p_responsable_entrega_sugerido: entregadoPor.trim(),
+          p_fecha_entrega_solicitada: fechaEntrega,
+          p_observaciones: observaciones.trim() || null,
+        }
       );
-      return;
-    }
 
-    if (
-      inventarioSeleccionado &&
-      cantidadNumero >
-        inventarioSeleccionado.cantidad_disponible
-    ) {
-      setError(
-        `Existencia insuficiente. Disponible: ${inventarioSeleccionado.cantidad_disponible}.`
-      );
-      return;
-    }
+      if (errorRpc) {
+        console.error(errorRpc);
 
-    if (!fechaEntrega) {
-      setError("Selecciona la fecha de reposición.");
-      return;
-    }
-
-    if (!entregadoPor.trim()) {
-      setError(
-        "Debes indicar quién realiza la reposición."
-      );
-      return;
-    }
-
-    if (!justificacion.trim()) {
-      setError(
-        "Debes registrar la justificación de la reposición."
-      );
-      return;
-    }
-
-    setGuardando(true);
-
-    const { data, error: errorRpc } = await supabase.rpc(
-      "registrar_reposicion_epp",
-      {
-        p_trabajador_id: trabajadorId,
-        p_epp_id: entregaSeleccionada.epp_id,
-
-        p_entrega_original_id:
-          entregaSeleccionada.entrega_id,
-
-        p_inventario_id: inventarioId,
-        p_ubicacion_id: ubicacionId,
-        p_cantidad: cantidadNumero,
-        p_motivo: motivo,
-
-        p_estado_epp_anterior:
-          estadoAnterior.trim() || null,
-
-        p_justificacion: justificacion.trim(),
-        p_entregado_por: entregadoPor.trim(),
-        p_fecha_entrega: fechaEntrega,
-
-        p_observaciones:
-          observaciones.trim() || null,
+        setError(
+          `No fue posible enviar la solicitud de reposición: ${errorRpc.message}`
+        );
+        return;
       }
-    );
 
-    if (errorRpc) {
-      console.error(errorRpc);
-
-      setError(
-        `No fue posible registrar la reposición: ${errorRpc.message}`
+      setMensaje(
+        `Solicitud enviada para aprobación correctamente. ID: ${data}. El inventario no ha sido descontado.`
       );
-
-      setGuardando(false);
-      return;
     }
 
-    setMensaje(
-      `Reposición registrada correctamente. ID: ${data}`
-    );
+    // =====================================================
+    // EPP QUE NO REQUIERE APROBACIÓN
+    // =====================================================
+
+    else {
+      const { data, error: errorRpc } = await supabase.rpc(
+        "registrar_reposicion_epp",
+        {
+          p_trabajador_id: trabajadorId,
+          p_epp_id: entregaSeleccionada.epp_id,
+          p_entrega_original_id: entregaSeleccionada.entrega_id,
+          p_inventario_id: inventarioId,
+          p_ubicacion_id: ubicacionId,
+          p_cantidad: cantidadNumero,
+          p_motivo: motivo,
+          p_estado_epp_anterior: estadoAnterior.trim() || null,
+          p_justificacion: justificacion.trim(),
+          p_entregado_por: entregadoPor.trim(),
+          p_fecha_entrega: fechaEntrega,
+          p_observaciones: observaciones.trim() || null,
+        }
+      );
+
+      if (errorRpc) {
+        console.error(errorRpc);
+
+        setError(
+          `No fue posible registrar la reposición: ${errorRpc.message}`
+        );
+        return;
+      }
+
+      setMensaje(`Reposición registrada correctamente. ID: ${data}`);
+    }
+
+    // =====================================================
+    // LIMPIAR Y ACTUALIZAR
+    // =====================================================
 
     setEntregaSeleccionadaId("");
     setInventarioId("");
@@ -767,10 +846,17 @@ export default function ReposicionesEppPage() {
     await cargarDatos();
     await cargarEntregasTrabajador(trabajadorId);
     await cargarHistorialReposiciones();
+  } catch (err: any) {
+    console.error(err);
 
+    setError(
+      err?.message ||
+        "Ocurrió un error inesperado al procesar la reposición."
+    );
+  } finally {
     setGuardando(false);
   }
-
+}
   // =========================================================
   // HISTORIAL - OPCIONES
   // =========================================================

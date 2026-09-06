@@ -41,11 +41,12 @@ type Inventario = {
   estado: string;
 
   epp_catalogo?: {
-    codigo: string;
-    nombre: string;
-    categoria: string;
-    unidad_medida: string;
-  } | null;
+  codigo: string;
+  nombre: string;
+  categoria: string;
+  unidad_medida: string;
+  requiere_aprobacion_reposicion: boolean;
+} | null;
 
   epp_ubicaciones?: {
     nombre: string;
@@ -62,22 +63,31 @@ type ItemEntrega = {
   serial: string | null;
   disponible: number;
   cantidad: number;
+  requiere_aprobacion_reposicion: boolean;
+};
+
+type EppEntregadoAnterior = {
+  id: string;
+  entrega_id: string;
+  epp_id: string;
+  inventario_id: string | null;
+  cantidad: number;
+  talla: string | null;
+  lote: string | null;
+  serial: string | null;
+  estado_elemento: string | null;
+  fecha_entrega: string;
+
+  epp_catalogo?: {
+    codigo: string;
+    nombre: string;
+  } | null;
 };
 
 const motivos = [
-  { value: "INGRESO", label: "Ingreso del trabajador" },
+   { value: "INGRESO", label: "Ingreso del trabajador" },
   { value: "DOTACION", label: "Dotación" },
   { value: "REPOSICION", label: "Reposición" },
-  { value: "CAMBIO_TALLA", label: "Cambio de talla" },
-  { value: "DETERIORO", label: "Deterioro" },
-  { value: "PERDIDA", label: "Pérdida" },
-  { value: "VENCIMIENTO", label: "Vencimiento" },
-  { value: "CONTAMINACION", label: "Contaminación" },
-  {
-    value: "REQUERIMIENTO_CLIENTE",
-    label: "Requerimiento del cliente",
-  },
-  { value: "OTRO", label: "Otro" },
 ];
 
 export default function EntregarEppPage() {
@@ -95,7 +105,9 @@ export default function EntregarEppPage() {
   const [entregadoPor, setEntregadoPor] = useState("");
   const [motivo, setMotivo] = useState("DOTACION");
   const [observaciones, setObservaciones] = useState("");
-
+const [motivoReposicion, setMotivoReposicion] = useState("");
+const [estadoEppAnterior, setEstadoEppAnterior] = useState("");
+const [justificacionReposicion, setJustificacionReposicion] = useState("");
   const [fechaEntrega, setFechaEntrega] = useState(
     new Date().toLocaleDateString("en-CA")
   );
@@ -106,6 +118,11 @@ export default function EntregarEppPage() {
 
   const [items, setItems] = useState<ItemEntrega[]>([]);
 
+const [eppEntregadosAnteriormente, setEppEntregadosAnteriormente] =
+  useState<EppEntregadoAnterior[]>([]);
+
+const [entregaOriginalId, setEntregaOriginalId] = useState("");
+const [detalleOriginalId, setDetalleOriginalId] = useState("");
   const [busquedaInventario, setBusquedaInventario] = useState("");
 
   const [cargando, setCargando] = useState(true);
@@ -161,11 +178,12 @@ export default function EntregarEppPage() {
           cantidad_disponible,
           estado,
           epp_catalogo (
-            codigo,
-            nombre,
-            categoria,
-            unidad_medida
-          ),
+  codigo,
+  nombre,
+  categoria,
+  unidad_medida,
+  requiere_aprobacion_reposicion
+),
           epp_ubicaciones (
             nombre
           )
@@ -332,7 +350,81 @@ export default function EntregarEppPage() {
   const registroSeleccionado = inventario.find(
     (registro) => registro.id === inventarioSeleccionado
   );
+const detalleOriginalSeleccionado =
+  eppEntregadosAnteriormente.find(
+    (eppAnterior) => eppAnterior.id === detalleOriginalId
+  );
+const reposicionRequiereAprobacion =
+  motivo === "REPOSICION" &&
+  items.some((item) => item.requiere_aprobacion_reposicion);
 
+async function cargarEppEntregadosAnteriormente(trabajadorIdConsulta: string) {
+  setEppEntregadosAnteriormente([]);
+  setEntregaOriginalId("");
+
+  if (!trabajadorIdConsulta) {
+    return;
+  }
+
+  const { data: entregas, error: errorEntregas } = await supabase
+    .from("epp_entregas")
+    .select("id,fecha_entrega")
+    .eq("trabajador_id", trabajadorIdConsulta)
+    .eq("estado", "CONFIRMADA")
+    .order("fecha_entrega", { ascending: false });
+
+  if (errorEntregas) {
+    console.error(errorEntregas);
+    setError(
+      `No fue posible consultar las entregas anteriores: ${errorEntregas.message}`
+    );
+    return;
+  }
+
+  if (!entregas || entregas.length === 0) {
+    return;
+  }
+
+  const idsEntregas = entregas.map((entrega) => entrega.id);
+
+  const { data: detalles, error: errorDetalles } = await supabase
+    .from("epp_entrega_detalle")
+    .select(`
+  id,
+  entrega_id,
+  epp_id,
+  inventario_id,
+  cantidad,
+  talla,
+  lote,
+  serial,
+  estado_elemento,
+  epp_catalogo (
+    codigo,
+    nombre
+  )
+`)
+    .in("entrega_id", idsEntregas);
+
+  if (errorDetalles) {
+    console.error(errorDetalles);
+    setError(
+      `No fue posible consultar los EPP entregados anteriormente: ${errorDetalles.message}`
+    );
+    return;
+  }
+
+  const fechasPorEntrega = new Map(
+    entregas.map((entrega) => [entrega.id, entrega.fecha_entrega])
+  );
+
+  const resultado = (detalles ?? []).map((detalle) => ({
+    ...detalle,
+    fecha_entrega: fechasPorEntrega.get(detalle.entrega_id) || "",
+  }));
+
+  setEppEntregadosAnteriormente(resultado as EppEntregadoAnterior[]);
+}
   function agregarItem() {
     setError("");
     setMensaje("");
@@ -346,7 +438,24 @@ export default function EntregarEppPage() {
       setError("No se encontró el inventario seleccionado.");
       return;
     }
+if (motivo === "REPOSICION") {
+  if (!detalleOriginalSeleccionado) {
+    setError(
+      "Selecciona primero el EPP anterior que será reemplazado."
+    );
+    return;
+  }
 
+  if (
+    registroSeleccionado.epp_id !==
+    detalleOriginalSeleccionado.epp_id
+  ) {
+    setError(
+      "El EPP de reposición debe ser del mismo tipo que el EPP que se está reemplazando."
+    );
+    return;
+  }
+}
     const cantidadNumero = Number(cantidad);
 
     if (
@@ -395,8 +504,10 @@ export default function EntregarEppPage() {
         lote: registroSeleccionado.lote,
         serial: registroSeleccionado.serial,
         disponible:
-          registroSeleccionado.cantidad_disponible,
-        cantidad: cantidadNumero,
+  registroSeleccionado.cantidad_disponible,
+cantidad: cantidadNumero,
+requiere_aprobacion_reposicion:
+  registroSeleccionado.epp_catalogo?.requiere_aprobacion_reposicion ?? false,
       },
     ]);
 
@@ -444,43 +555,169 @@ export default function EntregarEppPage() {
       );
       return;
     }
-
-    setGuardando(true);
-
-    const itemsRpc = items.map((item) => ({
-      inventario_id: item.inventario_id,
-      cantidad: item.cantidad,
-    }));
-
-  const { data, error: errorRpc } = await supabase.rpc(
-  "registrar_entrega_epp",
-  {
-    p_trabajador_id: trabajadorId,
-    p_ubicacion_id: ubicacionId,
-    p_entregado_por: entregadoPor.trim(),
-    p_motivo: motivo,
-    p_observaciones:
-      observaciones.trim() || null,
-    p_items: itemsRpc,
-    p_fecha_entrega: fechaEntrega,
+if (motivo === "REPOSICION") {
+  if (!detalleOriginalId || !entregaOriginalId) {
+    setError(
+      "Selecciona el EPP anterior que será reemplazado."
+    );
+    return;
   }
-);
 
-    if (errorRpc) {
-      console.error(errorRpc);
+  if (!motivoReposicion) {
+    setError(
+      "Selecciona el motivo de la reposición."
+    );
+    return;
+  }
 
-      setError(
-        `No fue posible registrar la entrega: ${errorRpc.message}`
-      );
+  if (!estadoEppAnterior) {
+    setError(
+      "Selecciona el estado del EPP anterior."
+    );
+    return;
+  }
 
-      setGuardando(false);
-      return;
+  if (!justificacionReposicion.trim()) {
+    setError(
+      "Debes registrar la justificación de la reposición."
+    );
+    return;
+  }
+
+  if (items.length !== 1) {
+    setError(
+      "Una reposición debe registrarse para un solo EPP a la vez."
+    );
+    return;
+  }
+
+  const itemReposicion = items[0];
+
+  if (
+    !detalleOriginalSeleccionado ||
+    itemReposicion.epp_id !== detalleOriginalSeleccionado.epp_id
+  ) {
+    setError(
+      "El EPP de reposición debe corresponder al mismo EPP que se está reemplazando."
+    );
+    return;
+  }
+}
+   setGuardando(true);
+
+let data: string | null = null;
+let errorRpc: any = null;
+
+if (motivo !== "REPOSICION") {
+  const itemsRpc = items.map((item) => ({
+    inventario_id: item.inventario_id,
+    cantidad: item.cantidad,
+  }));
+
+  const respuesta = await supabase.rpc(
+    "registrar_entrega_epp",
+    {
+      p_trabajador_id: trabajadorId,
+      p_ubicacion_id: ubicacionId,
+      p_entregado_por: entregadoPor.trim(),
+      p_motivo: motivo,
+      p_observaciones:
+        observaciones.trim() || null,
+      p_items: itemsRpc,
+      p_fecha_entrega: fechaEntrega,
     }
+  );
 
-    setMensaje(
-      `Entrega registrada correctamente. ID: ${data}`
+  data = respuesta.data;
+  errorRpc = respuesta.error;
+} else {
+  const itemReposicion = items[0];
+
+  if (reposicionRequiereAprobacion) {
+    const respuesta = await supabase.rpc(
+      "solicitar_reposicion_epp",
+      {
+        p_trabajador_id: trabajadorId,
+        p_epp_id: itemReposicion.epp_id,
+        p_entrega_original_id: entregaOriginalId,
+        p_inventario_id: itemReposicion.inventario_id,
+        p_ubicacion_id: ubicacionId,
+        p_cantidad: itemReposicion.cantidad,
+        p_motivo: motivoReposicion,
+        p_estado_epp_anterior: estadoEppAnterior,
+        p_justificacion: justificacionReposicion.trim(),
+        p_responsable_entrega_sugerido: entregadoPor.trim(),
+        p_fecha_entrega_solicitada: fechaEntrega,
+        p_observaciones:
+          observaciones.trim() || null,
+      }
     );
 
+    data = respuesta.data;
+    errorRpc = respuesta.error;
+  } else {
+    const respuesta = await supabase.rpc(
+      "registrar_reposicion_epp",
+      {
+        p_trabajador_id: trabajadorId,
+        p_epp_id: itemReposicion.epp_id,
+        p_entrega_original_id: entregaOriginalId,
+        p_inventario_id: itemReposicion.inventario_id,
+        p_ubicacion_id: ubicacionId,
+        p_cantidad: itemReposicion.cantidad,
+        p_motivo: motivoReposicion,
+        p_estado_epp_anterior: estadoEppAnterior,
+        p_justificacion: justificacionReposicion.trim(),
+        p_entregado_por: entregadoPor.trim(),
+        p_fecha_entrega: fechaEntrega,
+        p_observaciones:
+          observaciones.trim() || null,
+      }
+    );
+
+    data = respuesta.data;
+    errorRpc = respuesta.error;
+  }
+}
+
+if (errorRpc) {
+  const detalleError = [
+    errorRpc?.message,
+    errorRpc?.details,
+    errorRpc?.hint,
+    errorRpc?.code,
+  ]
+    .filter(Boolean)
+    .join(" | ");
+
+  console.log("ERROR RPC COMPLETO:", errorRpc);
+
+  setError(
+    motivo === "REPOSICION"
+      ? `No fue posible registrar la reposición: ${
+          detalleError || JSON.stringify(errorRpc)
+        }`
+      : `No fue posible registrar la entrega: ${
+          detalleError || JSON.stringify(errorRpc)
+        }`
+  );
+
+  setGuardando(false);
+  return;
+}
+if (motivo === "REPOSICION" && reposicionRequiereAprobacion) {
+  setMensaje(
+    `Solicitud de reposición enviada para aprobación. ID: ${data}`
+  );
+} else if (motivo === "REPOSICION") {
+  setMensaje(
+    `Reposición registrada correctamente. ID: ${data}`
+  );
+} else {
+  setMensaje(
+    `Entrega registrada correctamente. ID: ${data}`
+  );
+}
     setItems([]);
     setInventarioSeleccionado("");
     setCantidad("1");
@@ -566,7 +803,7 @@ export default function EntregarEppPage() {
                                 setTrabajadorId(
                                   trabajador.id
                                 );
-
+cargarEppEntregadosAnteriormente(trabajador.id);
                                 setBusquedaTrabajador(
                                   `${trabajador.nombres} ${trabajador.apellidos} - ${trabajador.identificacion}`
                                 );
@@ -686,6 +923,118 @@ export default function EntregarEppPage() {
                 </div>
 
               </div>
+{motivo === "REPOSICION" && (
+  <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
+    <h3 className="text-lg font-black">
+      Datos de la reposición
+    </h3>
+
+    <p className="mt-1 text-sm text-neutral-600">
+      Registra la causa y condición del EPP que será reemplazado.
+    </p>
+<div className="mt-5">
+  <Etiqueta texto="EPP anterior a reemplazar *" />
+
+  <select
+  value={detalleOriginalId}
+  onChange={(e) => {
+    const detalleId = e.target.value;
+
+    setDetalleOriginalId(detalleId);
+
+    const detalleSeleccionado =
+      eppEntregadosAnteriormente.find(
+        (eppAnterior) => eppAnterior.id === detalleId
+      );
+
+    setEntregaOriginalId(
+      detalleSeleccionado?.entrega_id || ""
+    );
+  }}
+    className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3"
+  >
+    <option value="">Seleccionar EPP entregado anteriormente...</option>
+
+    {eppEntregadosAnteriormente.map((eppAnterior) => (
+      <option
+        key={eppAnterior.id}
+        value={eppAnterior.id}
+      >
+        {eppAnterior.epp_catalogo?.codigo || "EPP"} -{" "}
+        {eppAnterior.epp_catalogo?.nombre || "Sin nombre"}
+        {eppAnterior.talla
+          ? ` | Talla ${eppAnterior.talla}`
+          : ""}
+        {eppAnterior.fecha_entrega
+          ? ` | Entregado: ${eppAnterior.fecha_entrega}`
+          : ""}
+      </option>
+    ))}
+  </select>
+
+  {trabajadorId && eppEntregadosAnteriormente.length === 0 && (
+    <p className="mt-2 text-sm text-amber-700">
+      Este trabajador no tiene EPP entregados anteriormente disponibles
+      para reposición.
+    </p>
+  )}
+</div>
+    <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div>
+        <Etiqueta texto="Motivo de la reposición *" />
+
+        <select
+          value={motivoReposicion}
+          onChange={(e) => setMotivoReposicion(e.target.value)}
+          className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3"
+       >
+  <option value="">Seleccionar...</option>
+  <option value="DETERIORO">Deterioro</option>
+  <option value="DANO_OPERACIONAL">Daño operacional</option>
+  <option value="CAMBIO_TALLA">Cambio de talla</option>
+  <option value="PERDIDA">Pérdida</option>
+  <option value="VENCIMIENTO">Vencimiento</option>
+  <option value="CONTAMINACION">Contaminación</option>
+  <option value="REQUERIMIENTO_CLIENTE">
+    Requerimiento del cliente
+  </option>
+  <option value="OTRO">Otro</option>
+        </select>
+      </div>
+
+      <div>
+        <Etiqueta texto="Estado del EPP anterior *" />
+
+        <select
+          value={estadoEppAnterior}
+          onChange={(e) => setEstadoEppAnterior(e.target.value)}
+          className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3"
+        >
+          <option value="">Seleccionar...</option>
+          <option value="DAÑADO">Dañado</option>
+          <option value="DETERIORADO">Deteriorado</option>
+          <option value="FUERA_DE_SERVICIO">
+            Fuera de servicio
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <div className="mt-5">
+      <Etiqueta texto="Justificación de la reposición *" />
+
+      <textarea
+        value={justificacionReposicion}
+        onChange={(e) => setJustificacionReposicion(e.target.value)}
+        rows={3}
+        placeholder="Describe brevemente por qué se requiere reemplazar el EPP..."
+        className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3"
+      />
+    </div>
+  </div>
+)}
+
+
 
               {trabajadorSeleccionado && (
                 <div className="mt-6 rounded-2xl bg-neutral-50 p-5">
@@ -969,7 +1318,19 @@ export default function EntregarEppPage() {
                   className="w-full rounded-xl border border-neutral-300 px-4 py-3"
                 />
               </div>
+{reposicionRequiereAprobacion && (
+  <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-5">
+    <div className="font-black text-amber-900">
+      ⚠️ Esta reposición requiere aprobación previa
+    </div>
 
+    <p className="mt-1 text-sm text-amber-800">
+      Uno o más EPP seleccionados requieren autorización antes de realizar
+      la entrega. El inventario no será descontado hasta completar la
+      aprobación.
+    </p>
+  </div>
+)}
               <button
                 type="button"
                 onClick={guardarEntrega}
