@@ -423,7 +423,9 @@ async function cargarEppEntregadosAnteriormente(trabajadorIdConsulta: string) {
     fecha_entrega: fechasPorEntrega.get(detalle.entrega_id) || "",
   }));
 
-  setEppEntregadosAnteriormente(resultado as EppEntregadoAnterior[]);
+  setEppEntregadosAnteriormente(
+  resultado as unknown as EppEntregadoAnterior[]
+); 
 }
   function agregarItem() {
     setError("");
