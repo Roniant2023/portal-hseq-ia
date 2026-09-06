@@ -79,9 +79,9 @@ type EppEntregadoAnterior = {
   fecha_entrega: string;
 
   epp_catalogo?: {
-    codigo: string;
-    nombre: string;
-  } | null;
+  codigo: string;
+  nombre: string;
+}[] | null;
 };
 
 const motivos = [
@@ -959,9 +959,8 @@ cargarEppEntregadosAnteriormente(trabajador.id);
       <option
         key={eppAnterior.id}
         value={eppAnterior.id}
-      >
-        {eppAnterior.epp_catalogo?.codigo || "EPP"} -{" "}
-        {eppAnterior.epp_catalogo?.nombre || "Sin nombre"}
+      >{eppAnterior.epp_catalogo?.[0]?.codigo || "EPP"} -{" "}
+{eppAnterior.epp_catalogo?.[0]?.nombre || "Sin nombre"}
         {eppAnterior.talla
           ? ` | Talla ${eppAnterior.talla}`
           : ""}
