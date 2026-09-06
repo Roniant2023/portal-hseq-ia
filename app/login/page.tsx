@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -34,9 +34,7 @@ export default function LoginPage() {
       router.push("/");
       router.refresh();
     } catch (err: any) {
-      setError(
-        err?.message || "No fue posible iniciar sesión."
-      );
+      setError(err?.message || "No fue posible iniciar sesión.");
     } finally {
       setCargando(false);
     }
@@ -66,8 +64,8 @@ export default function LoginPage() {
             </div>
 
             <p className="mt-1 text-sm font-medium text-amber-800">
-              Tu acceso al Portal HSEQ se encuentra deshabilitado.
-              Contacta al administrador para solicitar la reactivación.
+              Tu acceso al Portal HSEQ se encuentra deshabilitado. Contacta al
+              administrador para solicitar la reactivación.
             </p>
           </div>
         )}
@@ -85,18 +83,19 @@ export default function LoginPage() {
           </div>
         )}
 
-{estado === "password_actualizada" && (
-  <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-4">
-    <div className="font-black text-green-900">
-      Contraseña actualizada
-    </div>
+        {estado === "password_actualizada" && (
+          <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-4">
+            <div className="font-black text-green-900">
+              Contraseña actualizada
+            </div>
 
-    <p className="mt-1 text-sm font-medium text-green-800">
-      Tu contraseña fue actualizada correctamente.
-      Ya puedes iniciar sesión con la nueva contraseña.
-    </p>
-  </div>
-)}
+            <p className="mt-1 text-sm font-medium text-green-800">
+              Tu contraseña fue actualizada correctamente. Ya puedes iniciar
+              sesión con la nueva contraseña.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={iniciarSesion} className="space-y-5">
           <div>
             <label className="mb-2 block text-sm font-bold text-neutral-700">
@@ -129,13 +128,15 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
-<button
-  type="button"
-  onClick={() => router.push("/recuperar-password")}
-  className="w-full text-center text-sm font-bold text-green-700 transition hover:text-green-800"
->
-  ¿Olvidaste tu contraseña?
-</button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/recuperar-password")}
+            className="w-full text-center text-sm font-bold text-green-700 transition hover:text-green-800"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
               {error}
@@ -152,5 +153,21 @@ export default function LoginPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-neutral-50 p-6">
+          <div className="text-sm font-semibold text-neutral-600">
+            Cargando...
+          </div>
+        </main>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
