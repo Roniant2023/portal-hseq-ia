@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-
+import FirmaCanvas from "@/app/components/FirmaCanvas";
 type Trabajador = {
   id: string;
   identificacion: string;
@@ -83,7 +83,30 @@ type EppEntregadoAnterior = {
   nombre: string;
 }[] | null;
 };
+type ReposicionAprobada = {
+  id: string;
+  fecha_solicitud: string;
+  fecha_entrega_solicitada: string | null;
+  cantidad_solicitada: number;
+  motivo: string;
+  justificacion: string | null;
+  responsable_entrega_sugerido: string | null;
 
+  trabajador: {
+    identificacion: string;
+    nombres: string;
+    apellidos: string;
+  } | null;
+
+  epp: {
+    codigo: string;
+    nombre: string;
+  } | null;
+
+  ubicacion: {
+    nombre: string;
+  } | null;
+};
 const motivos = [
    { value: "INGRESO", label: "Ingreso del trabajador" },
   { value: "DOTACION", label: "Dotación" },
@@ -108,6 +131,7 @@ export default function EntregarEppPage() {
 const [motivoReposicion, setMotivoReposicion] = useState("");
 const [estadoEppAnterior, setEstadoEppAnterior] = useState("");
 const [justificacionReposicion, setJustificacionReposicion] = useState("");
+const [fotosReposicion, setFotosReposicion] = useState<File[]>([]);
   const [fechaEntrega, setFechaEntrega] = useState(
     new Date().toLocaleDateString("en-CA")
   );
@@ -130,7 +154,30 @@ const [detalleOriginalId, setDetalleOriginalId] = useState("");
 
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
+const [reposicionesAprobadas, setReposicionesAprobadas] =
+  useState<ReposicionAprobada[]>([]);
 
+const [procesandoReposicionId, setProcesandoReposicionId] =
+  useState("");
+
+const [responsableReposicion, setResponsableReposicion] =
+  useState<Record<string, string>>({});
+
+const [fechaReposicion, setFechaReposicion] =
+  useState<Record<string, string>>({});
+const [firmaEntrega, setFirmaEntrega] =
+  useState<Blob | null>(null);
+
+const [entregaPendienteFirmaId, setEntregaPendienteFirmaId] =
+  useState("");
+
+const [nombreRecibeFirma, setNombreRecibeFirma] =
+  useState("");
+
+const [guardandoFirma, setGuardandoFirma] =
+  useState(false);
+const [reposicionPendienteFirma, setReposicionPendienteFirma] =
+  useState<ReposicionAprobada | null>(null);
   async function cargarDatos() {
     setCargando(true);
     setError("");
@@ -255,9 +302,10 @@ const [detalleOriginalId, setDetalleOriginalId] = useState("");
     setCargando(false);
   }
 
-  useEffect(() => {
-    cargarDatos();
-  }, []);
+ useEffect(() => {
+  cargarDatos();
+  cargarReposicionesAprobadas();
+}, []);
 
   const trabajadoresFiltrados = useMemo(() => {
     const texto = busquedaTrabajador.trim().toLowerCase();
@@ -357,7 +405,63 @@ const detalleOriginalSeleccionado =
 const reposicionRequiereAprobacion =
   motivo === "REPOSICION" &&
   items.some((item) => item.requiere_aprobacion_reposicion);
+async function cargarReposicionesAprobadas() {
+  const { data, error: errorReposiciones } = await supabase
+    .from("epp_reposiciones")
+    .select(`
+      id,
+      fecha_solicitud,
+      fecha_entrega_solicitada,
+      cantidad_solicitada,
+      motivo,
+      justificacion,
+      responsable_entrega_sugerido,
+      trabajador:epp_trabajadores (
+        identificacion,
+        nombres,
+        apellidos
+      ),
+      epp:epp_catalogo (
+        codigo,
+        nombre
+      ),
+      ubicacion:epp_ubicaciones (
+        nombre
+      )
+    `)
+    .eq("estado", "APROBADA")
+    .eq("requiere_aprobacion", true)
+    .is("nueva_entrega_id", null)
+    .order("fecha_aprobacion", { ascending: true });
 
+  if (errorReposiciones) {
+    console.error(
+      "ERROR CONSULTANDO REPOSICIONES APROBADAS:",
+      errorReposiciones
+    );
+    return;
+  }
+
+  const resultado =
+    (data ?? []) as unknown as ReposicionAprobada[];
+
+  setReposicionesAprobadas(resultado);
+
+  const responsablesIniciales: Record<string, string> = {};
+  const fechasIniciales: Record<string, string> = {};
+
+  resultado.forEach((reposicion) => {
+    responsablesIniciales[reposicion.id] =
+      reposicion.responsable_entrega_sugerido || "";
+
+    fechasIniciales[reposicion.id] =
+      reposicion.fecha_entrega_solicitada ||
+      new Date().toLocaleDateString("en-CA");
+  });
+
+  setResponsableReposicion(responsablesIniciales);
+  setFechaReposicion(fechasIniciales);
+}
 async function cargarEppEntregadosAnteriormente(trabajadorIdConsulta: string) {
   setEppEntregadosAnteriormente([]);
   setEntregaOriginalId("");
@@ -524,7 +628,228 @@ requiere_aprobacion_reposicion:
       )
     );
   }
+async function subirFotosReposicion(reposicionId: string) {
+  for (let index = 0; index < fotosReposicion.length; index++) {
+    const foto = fotosReposicion[index];
 
+    const extension =
+      foto.name.split(".").pop()?.toLowerCase() || "jpg";
+
+    const nombreArchivo = `foto-${index + 1}-${crypto.randomUUID()}.${extension}`;
+
+    const rutaStorage = `${reposicionId}/${nombreArchivo}`;
+
+    const { error: errorStorage } = await supabase.storage
+      .from("epp-reposiciones")
+      .upload(rutaStorage, foto, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: foto.type,
+      });
+
+    if (errorStorage) {
+      throw new Error(
+        `No fue posible subir la fotografía ${index + 1}: ${errorStorage.message}`
+      );
+    }
+
+    const { error: errorRegistro } = await supabase
+      .from("epp_reposiciones_fotos")
+      .insert({
+        reposicion_id: reposicionId,
+        ruta_storage: rutaStorage,
+        nombre_archivo: foto.name,
+        orden: index + 1,
+      });
+
+    if (errorRegistro) {
+      // Evitar dejar el archivo huérfano si falla el registro en la tabla.
+      await supabase.storage
+        .from("epp-reposiciones")
+        .remove([rutaStorage]);
+
+      throw new Error(
+        `No fue posible registrar la fotografía ${index + 1}: ${errorRegistro.message}`
+      );
+    }
+  }
+}
+async function guardarFirmaEntrega() {
+  setMensaje("");
+  setError("");
+
+  if (!entregaPendienteFirmaId) {
+    setError("No se encontró la entrega que se va a firmar.");
+    return;
+  }
+
+  if (!nombreRecibeFirma.trim()) {
+    setError("Debes indicar el nombre de quien recibe el EPP.");
+    return;
+  }
+
+  if (!firmaEntrega) {
+    setError("El trabajador debe registrar su firma.");
+    return;
+  }
+
+  setGuardandoFirma(true);
+
+  const nombreArchivo = `firma-${crypto.randomUUID()}.png`;
+  const rutaStorage =
+    `${entregaPendienteFirmaId}/${nombreArchivo}`;
+
+  try {
+    const { error: errorStorage } =
+      await supabase.storage
+        .from("epp-firmas")
+        .upload(rutaStorage, firmaEntrega, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: "image/png",
+        });
+
+    if (errorStorage) {
+      throw new Error(
+        `No fue posible guardar la firma: ${errorStorage.message}`
+      );
+    }
+
+    const { error: errorFirma } =
+      await supabase.rpc(
+        "registrar_firma_entrega_epp",
+        {
+          p_entrega_id: entregaPendienteFirmaId,
+          p_recibido_por: nombreRecibeFirma.trim(),
+          p_firma_url: rutaStorage,
+        }
+      );
+
+    if (errorFirma) {
+      // Si falla el registro en la base de datos,
+      // eliminamos la imagen para no dejar archivos huérfanos.
+      await supabase.storage
+        .from("epp-firmas")
+        .remove([rutaStorage]);
+
+      throw new Error(
+        `No fue posible asociar la firma a la entrega: ${errorFirma.message}`
+      );
+    }
+
+setMensaje("Firma registrada correctamente.");
+
+setFirmaEntrega(null);
+setEntregaPendienteFirmaId("");
+setNombreRecibeFirma("");
+setReposicionPendienteFirma(null);
+  } catch (errorFirma: any) {
+    console.error(
+      "ERROR REGISTRANDO FIRMA DE EPP:",
+      errorFirma
+    );
+
+    setError(
+      errorFirma?.message ||
+        "Ocurrió un error al registrar la firma."
+    );
+  } finally {
+    setGuardandoFirma(false);
+  }
+}
+async function entregarReposicionAprobada(
+  reposicion: ReposicionAprobada
+) {
+  setMensaje("");
+  setError("");
+
+  const responsable =
+    responsableReposicion[reposicion.id]?.trim() || "";
+
+  const fecha =
+    fechaReposicion[reposicion.id] || "";
+
+  if (!responsable) {
+    setError(
+      "Debes indicar el responsable de la entrega."
+    );
+    return;
+  }
+
+  if (!fecha) {
+    setError(
+      "Debes indicar la fecha de entrega."
+    );
+    return;
+  }
+
+  const confirmar = window.confirm(
+    `¿Confirmas la entrega de ${
+      reposicion.epp?.nombre || "este EPP"
+    } a ${
+      reposicion.trabajador?.nombres || ""
+    } ${
+      reposicion.trabajador?.apellidos || ""
+    }?`
+  );
+
+  if (!confirmar) {
+    return;
+  }
+
+  setProcesandoReposicionId(reposicion.id);
+
+  const { data, error: errorEntrega } =
+    await supabase.rpc(
+      "entregar_reposicion_aprobada",
+      {
+        p_reposicion_id: reposicion.id,
+        p_entregado_por: responsable,
+        p_fecha_entrega: fecha,
+        p_observaciones: null,
+      }
+    );
+
+  if (errorEntrega) {
+    console.error(
+      "ERROR ENTREGANDO REPOSICIÓN APROBADA:",
+      errorEntrega
+    );
+
+    setError(
+      `No fue posible realizar la entrega: ${
+        errorEntrega.message
+      }`
+    );
+
+    setProcesandoReposicionId("");
+    return;
+  }
+
+  setMensaje(
+  "Reposición entregada correctamente. Pendiente firma de recibido."
+);
+
+if (data) {
+  setEntregaPendienteFirmaId(data);
+
+  setNombreRecibeFirma(
+    reposicion.trabajador
+      ? `${reposicion.trabajador.nombres} ${reposicion.trabajador.apellidos}`
+      : ""
+  );
+
+  setFirmaEntrega(null);
+  setReposicionPendienteFirma(reposicion);
+}
+
+await Promise.all([
+  cargarReposicionesAprobadas(),
+  cargarDatos(),
+]);
+
+setProcesandoReposicionId("");
+}
   async function guardarEntrega() {
     setMensaje("");
     setError("");
@@ -585,6 +910,22 @@ if (motivo === "REPOSICION") {
     );
     return;
   }
+
+if (reposicionRequiereAprobacion) {
+  if (fotosReposicion.length < 3) {
+    setError(
+      "Debes adjuntar mínimo 3 fotografías del EPP que será reemplazado."
+    );
+    return;
+  }
+
+  if (fotosReposicion.length > 5) {
+    setError(
+      "Solo puedes adjuntar máximo 5 fotografías del EPP que será reemplazado."
+    );
+    return;
+  }
+}
 
   if (items.length !== 1) {
     setError(
@@ -707,24 +1048,110 @@ if (errorRpc) {
   setGuardando(false);
   return;
 }
+
+if (motivo === "REPOSICION" && reposicionRequiereAprobacion) {
+  if (!data) {
+    setError(
+      "La reposición fue procesada, pero no se recibió el ID del registro."
+    );
+    setGuardando(false);
+    return;
+  }
+
+  try {
+    await subirFotosReposicion(data);
+  } catch (errorFotos: any) {
+    console.error("ERROR SUBIENDO FOTOS:", errorFotos);
+
+    setError(
+      `La reposición fue registrada, pero ocurrió un error al guardar la evidencia fotográfica: ${
+        errorFotos?.message || "Error desconocido"
+      }`
+    );
+
+    setGuardando(false);
+    return;
+  }
+}
 if (motivo === "REPOSICION" && reposicionRequiereAprobacion) {
   setMensaje(
     `Solicitud de reposición enviada para aprobación. ID: ${data}`
   );
 } else if (motivo === "REPOSICION") {
+  if (!data) {
+    setError(
+      "La reposición fue registrada, pero no se recibió el ID de la reposición."
+    );
+    setGuardando(false);
+    return;
+  }
+
+  const { data: reposicionRegistrada, error: errorConsultaReposicion } =
+    await supabase
+      .from("epp_reposiciones")
+      .select("nueva_entrega_id")
+      .eq("id", data)
+      .single();
+
+  if (errorConsultaReposicion) {
+    console.error(
+      "ERROR CONSULTANDO ENTREGA DE LA REPOSICIÓN:",
+      errorConsultaReposicion
+    );
+
+    setError(
+      `La reposición fue registrada, pero no fue posible obtener la entrega para la firma: ${errorConsultaReposicion.message}`
+    );
+
+    setGuardando(false);
+    return;
+  }
+
+  if (!reposicionRegistrada?.nueva_entrega_id) {
+    setError(
+      "La reposición fue registrada, pero no se encontró la entrega asociada para registrar la firma."
+    );
+
+    setGuardando(false);
+    return;
+  }
+
   setMensaje(
-    `Reposición registrada correctamente. ID: ${data}`
+    "Reposición registrada correctamente. Pendiente firma de recibido."
   );
+
+  setEntregaPendienteFirmaId(
+    reposicionRegistrada.nueva_entrega_id
+  );
+
+  setNombreRecibeFirma(
+    trabajadorSeleccionado
+      ? `${trabajadorSeleccionado.nombres} ${trabajadorSeleccionado.apellidos}`
+      : ""
+  );
+
+  setFirmaEntrega(null);
 } else {
   setMensaje(
-    `Entrega registrada correctamente. ID: ${data}`
+    `Entrega registrada correctamente. Pendiente firma de recibido.`
   );
+if (data) {
+  setEntregaPendienteFirmaId(data);
+
+  setNombreRecibeFirma(
+    trabajadorSeleccionado
+      ? `${trabajadorSeleccionado.nombres} ${trabajadorSeleccionado.apellidos}`
+      : ""
+  );
+
+  setFirmaEntrega(null);
+}
 }
     setItems([]);
     setInventarioSeleccionado("");
     setCantidad("1");
     setObservaciones("");
-
+setFotosReposicion([]);
     await cargarDatos();
 
     setGuardando(false);
@@ -756,8 +1183,226 @@ if (motivo === "REPOSICION" && reposicionRequiereAprobacion) {
           <div className="rounded-3xl border border-neutral-200 p-10 text-center">
             Cargando información...
           </div>
-        ) : (
-          <>
+       ) : reposicionPendienteFirma && entregaPendienteFirmaId ? (
+  <section className="rounded-3xl border border-blue-200 bg-blue-50/40 p-6 md:p-8 shadow-sm">
+
+    <div className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
+      ENTREGA REALIZADA
+    </div>
+
+    <h2 className="mt-4 text-3xl font-black text-neutral-950">
+      Firma de recibido
+    </h2>
+
+    <p className="mt-2 text-neutral-600">
+      La entrega ya fue registrada. Verifica la información antes de que
+      el trabajador firme el recibido.
+    </p>
+
+    <div className="mt-6 rounded-2xl border border-neutral-200 bg-white p-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+        <Dato
+          titulo="Trabajador"
+          valor={
+            reposicionPendienteFirma.trabajador
+              ? `${reposicionPendienteFirma.trabajador.nombres} ${reposicionPendienteFirma.trabajador.apellidos}`
+              : "—"
+          }
+        />
+
+        <Dato
+          titulo="Identificación"
+          valor={
+            reposicionPendienteFirma.trabajador?.identificacion
+              ? `CC ${reposicionPendienteFirma.trabajador.identificacion}`
+              : "—"
+          }
+        />
+
+        <Dato
+          titulo="EPP entregado"
+          valor={
+            reposicionPendienteFirma.epp
+              ? `${reposicionPendienteFirma.epp.codigo} - ${reposicionPendienteFirma.epp.nombre}`
+              : "—"
+          }
+        />
+
+        <Dato
+          titulo="Cantidad"
+          valor={String(reposicionPendienteFirma.cantidad_solicitada)}
+        />
+
+        <Dato
+          titulo="Lugar de entrega"
+          valor={reposicionPendienteFirma.ubicacion?.nombre || "—"}
+        />
+
+        <Dato
+          titulo="Motivo de reposición"
+          valor={reposicionPendienteFirma.motivo}
+        />
+
+      </div>
+
+      {reposicionPendienteFirma.justificacion && (
+        <div className="mt-4">
+          <Dato
+            titulo="Justificación"
+            valor={reposicionPendienteFirma.justificacion}
+          />
+        </div>
+      )}
+    </div>
+
+    <div className="mt-6">
+      <Etiqueta texto="Recibido por *" />
+
+      <input
+        value={nombreRecibeFirma}
+        onChange={(e) => setNombreRecibeFirma(e.target.value)}
+        placeholder="Nombre completo del trabajador"
+        className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3"
+      />
+    </div>
+
+    <div className="mt-6">
+      <Etiqueta texto="Firma del trabajador *" />
+
+      <div className="mt-2">
+        <FirmaCanvas
+          onChange={(firma) => setFirmaEntrega(firma)}
+        />
+      </div>
+    </div>
+
+    <button
+      type="button"
+      onClick={guardarFirmaEntrega}
+      disabled={guardandoFirma || !firmaEntrega}
+      className="mt-6 w-full rounded-xl bg-blue-700 px-5 py-4 text-lg font-black text-white disabled:opacity-40"
+    >
+      {guardandoFirma
+        ? "Registrando firma..."
+        : "Registrar firma de recibido"}
+    </button>
+
+  </section>
+) : (
+  <>
+    {reposicionesAprobadas.length > 0 && (
+  <section className="rounded-3xl border border-green-200 bg-green-50/40 p-6 md:p-8 shadow-sm">
+    <div>
+      <h2 className="text-2xl font-black">
+        Reposiciones aprobadas pendientes de entrega
+      </h2>
+
+      <p className="mt-2 text-sm text-neutral-600">
+        Estas solicitudes ya fueron autorizadas y están listas para
+        realizar la entrega física al trabajador.
+      </p>
+    </div>
+
+    <div className="mt-6 space-y-4">
+      {reposicionesAprobadas.map((reposicion) => (
+        <div
+          key={reposicion.id}
+          className="rounded-2xl border border-green-200 bg-white p-5"
+        >
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <div className="text-lg font-black">
+                {reposicion.epp?.codigo || "EPP"} -{" "}
+                {reposicion.epp?.nombre || "Sin nombre"}
+              </div>
+
+              <div className="text-sm text-neutral-700">
+                <span className="font-bold">Trabajador:</span>{" "}
+                {reposicion.trabajador?.nombres || ""}{" "}
+                {reposicion.trabajador?.apellidos || ""}
+                {reposicion.trabajador?.identificacion
+                  ? ` · CC ${reposicion.trabajador.identificacion}`
+                  : ""}
+              </div>
+
+              <div className="text-sm text-neutral-700">
+                <span className="font-bold">Ubicación:</span>{" "}
+                {reposicion.ubicacion?.nombre || "—"}
+              </div>
+
+              <div className="text-sm text-neutral-700">
+                <span className="font-bold">Cantidad:</span>{" "}
+                {reposicion.cantidad_solicitada}
+              </div>
+
+              <div className="text-sm text-neutral-700">
+                <span className="font-bold">Motivo:</span>{" "}
+                {reposicion.motivo}
+              </div>
+
+              {reposicion.justificacion && (
+                <div className="text-sm text-neutral-700">
+                  <span className="font-bold">Justificación:</span>{" "}
+                  {reposicion.justificacion}
+                </div>
+              )}
+            </div>
+
+            <div className="w-full space-y-4 lg:max-w-sm">
+              <div>
+                <Etiqueta texto="Responsable de la entrega *" />
+
+                <input
+                  value={responsableReposicion[reposicion.id] || ""}
+                  onChange={(e) =>
+                    setResponsableReposicion((anteriores) => ({
+                      ...anteriores,
+                      [reposicion.id]: e.target.value,
+                    }))
+                  }
+                  placeholder="Nombre del responsable"
+                  className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3"
+                />
+              </div>
+
+              <div>
+                <Etiqueta texto="Fecha de entrega *" />
+
+                <input
+                  type="date"
+                  value={fechaReposicion[reposicion.id] || ""}
+                  onChange={(e) =>
+                    setFechaReposicion((anteriores) => ({
+                      ...anteriores,
+                      [reposicion.id]: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3"
+                />
+              </div>
+
+              <button
+                type="button"
+                disabled={
+                  procesandoReposicionId === reposicion.id
+                }
+                onClick={() =>
+                  entregarReposicionAprobada(reposicion)
+                }
+                className="w-full rounded-xl bg-green-700 px-5 py-3 font-black text-white disabled:opacity-40"
+              >
+                {procesandoReposicionId === reposicion.id
+                  ? "Registrando entrega..."
+                  : "Realizar entrega"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
             <section className="rounded-3xl border border-neutral-200 p-6 md:p-8 shadow-sm">
 
               <h2 className="text-2xl font-black">
@@ -1039,10 +1684,9 @@ cargarEppEntregadosAnteriormente(trabajador.id);
         className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3"
       />
     </div>
+
   </div>
 )}
-
-
 
               {trabajadorSeleccionado && (
                 <div className="mt-6 rounded-2xl bg-neutral-50 p-5">
@@ -1339,6 +1983,80 @@ cargarEppEntregadosAnteriormente(trabajador.id);
     </p>
   </div>
 )}
+{reposicionRequiereAprobacion && (
+  <div className="mt-5">
+    <Etiqueta texto="Evidencia fotográfica del EPP a reemplazar *" />
+
+  <p className="mb-3 text-sm text-neutral-600">
+    Adjunta mínimo 3 y máximo 5 fotografías que permitan evidenciar
+    claramente el estado del elemento.
+  </p>
+
+  <input
+    type="file"
+    accept="image/jpeg,image/png,image/webp"
+    multiple
+    
+    onChange={(e) => {
+  const nuevosArchivos = Array.from(e.target.files ?? []);
+
+  const totalFotos = [
+    ...fotosReposicion,
+    ...nuevosArchivos,
+  ];
+
+  if (totalFotos.length > 5) {
+    setError(
+      "Solo puedes adjuntar máximo 5 fotografías."
+    );
+    e.target.value = "";
+    return;
+  }
+
+  setFotosReposicion(totalFotos);
+  setError("");
+
+  // Permite volver a seleccionar archivos posteriormente
+  e.target.value = "";
+}}
+    className="block w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm"
+  />
+
+  <div className="mt-3 text-sm font-semibold">
+    {fotosReposicion.length} de 5 fotografías seleccionadas
+  </div>
+ {fotosReposicion.map((foto, index) => (
+  <div
+    key={`${foto.name}-${index}`}
+    className="overflow-hidden rounded-xl border border-neutral-200 bg-white"
+  >
+    <img
+      src={URL.createObjectURL(foto)}
+      alt={`Evidencia ${index + 1}`}
+      className="h-40 w-full object-cover"
+    />
+
+    <div className="flex items-center justify-between px-3 py-2">
+      <span className="text-xs text-neutral-600">
+        Foto {index + 1}
+      </span>
+
+      <button
+        type="button"
+        onClick={() => {
+          setFotosReposicion((anteriores) =>
+            anteriores.filter((_, i) => i !== index)
+          );
+        }}
+        className="rounded-lg border border-red-200 px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-50"
+      >
+        Quitar
+      </button>
+    </div>
+  </div>
+))}
+    </div>
+)}
               <button
                 type="button"
                 onClick={guardarEntrega}
@@ -1349,7 +2067,54 @@ cargarEppEntregadosAnteriormente(trabajador.id);
                   ? "Registrando entrega..."
                   : "Confirmar entrega de EPP"}
               </button>
+{entregaPendienteFirmaId && (
+  <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50/50 p-5 md:p-6">
+    <div>
+      <h3 className="text-xl font-black text-blue-950">
+        Firma de recibido
+      </h3>
 
+      <p className="mt-1 text-sm text-blue-800">
+        La entrega ya fue registrada. El trabajador debe firmar
+        para dejar evidencia de recibido.
+      </p>
+    </div>
+
+    <div className="mt-5">
+      <Etiqueta texto="Recibido por *" />
+
+      <input
+        value={nombreRecibeFirma}
+        onChange={(e) =>
+          setNombreRecibeFirma(e.target.value)
+        }
+        className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3"
+        placeholder="Nombre del trabajador que recibe"
+      />
+    </div>
+
+    <div className="mt-5">
+      <Etiqueta texto="Firma del trabajador *" />
+
+      <div className="mt-2">
+        <FirmaCanvas
+          onChange={(firma) => setFirmaEntrega(firma)}
+        />
+      </div>
+    </div>
+
+    <button
+      type="button"
+      onClick={guardarFirmaEntrega}
+      disabled={guardandoFirma || !firmaEntrega}
+      className="mt-5 w-full rounded-xl bg-blue-700 px-5 py-4 font-black text-white disabled:opacity-40"
+    >
+      {guardandoFirma
+        ? "Guardando firma..."
+        : "Registrar firma de recibido"}
+    </button>
+  </div>
+)}
               {mensaje && (
                 <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                   {mensaje}

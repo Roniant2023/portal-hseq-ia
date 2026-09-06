@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-
-
 const modules = [
   {
     title: "Dashboard EPP",
@@ -36,11 +34,11 @@ const modules = [
     href: "/control-trabajo/epp/inventario",
   },
   {
-    title: "Reposiciones",
+    title: "Aprobaciones",
     description:
-      "Registrar cambios, deterioros, pérdidas y reposiciones extraordinarias.",
-    icon: "🔄",
-    href: "#",
+      "Revisar y decidir solicitudes de reposición de EPP que requieren autorización.",
+    icon: "✅",
+    href: "/control-trabajo/epp/aprobaciones",
   },
   {
     title: "Reportes",
@@ -50,12 +48,20 @@ const modules = [
     href: "#",
   },
 ];
+
 export default function EppPage() {
   const router = useRouter();
 
   const [verificando, setVerificando] = useState(true);
   const [puedeVer, setPuedeVer] = useState(false);
 
+  const [puedeAprobarReposiciones, setPuedeAprobarReposiciones] =
+    useState(false);
+
+  const [pendientesAprobacion, setPendientesAprobacion] =
+    useState(0);
+const [pendientesEntrega, setPendientesEntrega] =
+  useState(0);
   useEffect(() => {
     let activo = true;
 
@@ -94,6 +100,71 @@ export default function EppPage() {
         }
 
         setPuedeVer(true);
+const {
+  count: countPendientesEntrega,
+  error: errorPendientesEntrega,
+} = await supabase
+  .from("epp_reposiciones")
+  .select("id", {
+    count: "exact",
+    head: true,
+  })
+  .eq("estado", "APROBADA")
+  .eq("requiere_aprobacion", true)
+  .is("nueva_entrega_id", null);
+
+if (!activo) return;
+
+if (errorPendientesEntrega) {
+  console.error(
+    "Error consultando entregas pendientes:",
+    errorPendientesEntrega
+  );
+} else {
+  setPendientesEntrega(countPendientesEntrega ?? 0);
+}
+        const {
+          data: permisoAprobacion,
+          error: errorPermisoAprobacion,
+        } = await supabase.rpc(
+          "puede_aprobar_reposiciones_epp",
+          {
+            p_user_id: user.id,
+          }
+        );
+
+        if (!activo) return;
+
+        if (errorPermisoAprobacion) {
+          console.error(
+            "Error validando permiso de aprobación de reposiciones:",
+            errorPermisoAprobacion
+          );
+        } else if (permisoAprobacion === true) {
+          setPuedeAprobarReposiciones(true);
+
+          const {
+            count,
+            error: errorPendientes,
+          } = await supabase
+            .from("epp_reposiciones")
+            .select("id", {
+              count: "exact",
+              head: true,
+            })
+            .eq("estado", "PENDIENTE_APROBACION");
+
+          if (!activo) return;
+
+          if (errorPendientes) {
+            console.error(
+              "Error consultando reposiciones pendientes:",
+              errorPendientes
+            );
+          } else {
+            setPendientesAprobacion(count ?? 0);
+          }
+        }
       } catch (err) {
         console.error("Error validando acceso a EPP:", err);
 
@@ -163,6 +234,36 @@ export default function EppPage() {
               <h2 className="text-xl font-black">
                 {module.title}
               </h2>
+{module.title === "Entregar EPP" &&
+  pendientesEntrega > 0 && (
+    <div className="mt-3">
+      <span className="inline-flex items-center gap-2 rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-700">
+        <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
+
+        {pendientesEntrega}{" "}
+        {pendientesEntrega === 1
+          ? "entrega pendiente"
+          : "entregas pendientes"}
+      </span>
+    </div>
+  )}
+              {module.title === "Aprobaciones" &&
+                puedeAprobarReposiciones && (
+                  <div className="mt-3">
+                    {pendientesAprobacion > 0 ? (
+                      <span className="inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-black text-red-700">
+                        {pendientesAprobacion}{" "}
+                        {pendientesAprobacion === 1
+                          ? "solicitud pendiente"
+                          : "solicitudes pendientes"}
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
+                        Sin pendientes
+                      </span>
+                    )}
+                  </div>
+                )}
 
               <p className="mt-2 text-sm text-neutral-600 leading-relaxed">
                 {module.description}
