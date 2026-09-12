@@ -33,7 +33,26 @@ type FotoReposicion = {
   orden: number;
   url?: string;
 };
+type HallazgoIA = {
+  tipo?: string;
+  descripcion?: string;
+  imagen_referencia?: string;
+};
 
+type AnalisisIA = {
+  id: string;
+  reposicion_id: string;
+  modelo: string;
+  resumen: string | null;
+  hallazgos: HallazgoIA[] | null;
+  severidad_visible: string | null;
+  calidad_evidencia: string | null;
+  consistencia_imagenes: string | null;
+  evaluacion_soporte: string | null;
+  recomendacion_apoyo: string | null;
+  advertencias: string | null;
+  created_at: string;
+};
 export default function AprobacionesEppPage() {
   const router = useRouter();
 
@@ -46,10 +65,17 @@ export default function AprobacionesEppPage() {
   >({});
 
   const [cargando, setCargando] = useState(true);
-  const [procesandoId, setProcesandoId] = useState("");
-  const [motivoRechazo, setMotivoRechazo] = useState<
-    Record<string, string>
-  >({});
+const [procesandoId, setProcesandoId] = useState("");
+
+const [analizandoId, setAnalizandoId] = useState("");
+
+const [analisisPorSolicitud, setAnalisisPorSolicitud] = useState<
+  Record<string, AnalisisIA>
+>({});
+
+const [motivoRechazo, setMotivoRechazo] = useState<
+  Record<string, string>
+>({});
 
   const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
@@ -193,11 +219,14 @@ export default function AprobacionesEppPage() {
       })
     );
 
-    setSolicitudes(solicitudesNormalizadas);
+   setSolicitudes(solicitudesNormalizadas);
 
-    await cargarFotos(solicitudesNormalizadas);
+await Promise.all([
+  cargarFotos(solicitudesNormalizadas),
+  cargarAnalisis(solicitudesNormalizadas),
+]);
 
-    setCargando(false);
+setCargando(false);
   }
 
   async function cargarFotos(solicitudesActuales: Solicitud[]) {
@@ -252,7 +281,122 @@ export default function AprobacionesEppPage() {
 
     setFotosPorSolicitud(agrupadas);
   }
+async function cargarAnalisis(
+  solicitudesActuales: Solicitud[]
+) {
+  if (solicitudesActuales.length === 0) {
+    setAnalisisPorSolicitud({});
+    return;
+  }
 
+  const ids = solicitudesActuales.map(
+    (solicitud) => solicitud.id
+  );
+
+  const { data, error: errorAnalisis } = await supabase
+    .from("epp_reposiciones_analisis_ia")
+    .select(`
+      id,
+      reposicion_id,
+      modelo,
+      resumen,
+      hallazgos,
+      severidad_visible,
+      calidad_evidencia,
+      consistencia_imagenes,
+      evaluacion_soporte,
+      recomendacion_apoyo,
+      advertencias,
+      created_at
+    `)
+    .in("reposicion_id", ids)
+    .order("created_at", { ascending: false });
+
+  if (errorAnalisis) {
+    console.error(
+      "Error consultando análisis IA:",
+      errorAnalisis
+    );
+    return;
+  }
+
+  const porSolicitud: Record<string, AnalisisIA> = {};
+
+  for (const registro of data ?? []) {
+    if (!porSolicitud[registro.reposicion_id]) {
+      porSolicitud[registro.reposicion_id] =
+        registro as AnalisisIA;
+    }
+  }
+
+  setAnalisisPorSolicitud(porSolicitud);
+}
+async function analizarConIA(id: string) {
+  setMensaje("");
+  setError("");
+  setAnalizandoId(id);
+
+  try {
+    const { data: sesionData, error: sesionError } =
+      await supabase.auth.getSession();
+
+    if (
+      sesionError ||
+      !sesionData.session?.access_token
+    ) {
+      setError(
+        "No fue posible validar la sesión para realizar el análisis con IA."
+      );
+      return;
+    }
+
+    const respuesta = await fetch(
+      "/api/reposiciones/analizar",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sesionData.session.access_token}`,
+        },
+        body: JSON.stringify({
+          reposicion_id: id,
+        }),
+      }
+    );
+
+    const resultado = await respuesta.json();
+
+    if (!respuesta.ok) {
+      setError(
+        resultado?.error ||
+          "No fue posible realizar el análisis con IA."
+      );
+      return;
+    }
+
+    if (resultado?.analisis) {
+      setAnalisisPorSolicitud((anteriores) => ({
+        ...anteriores,
+        [id]: resultado.analisis as AnalisisIA,
+      }));
+    }
+
+    setMensaje(
+      "Análisis asistido por IA generado correctamente. La decisión continúa siendo exclusivamente del aprobador humano."
+    );
+  } catch (err) {
+    console.error(
+      "Error analizando reposición con IA:",
+      err
+    );
+
+    setError(
+      "Ocurrió un error inesperado durante el análisis con IA."
+    );
+  } finally {
+    setAnalizandoId("");
+  }
+}
   async function aprobarSolicitud(id: string) {
     setMensaje("");
     setError("");
@@ -399,10 +543,13 @@ export default function AprobacionesEppPage() {
         ) : (
           <section className="space-y-6">
             {solicitudes.map((solicitud) => {
-              const fotos =
-                fotosPorSolicitud[solicitud.id] ?? [];
+  const fotos =
+    fotosPorSolicitud[solicitud.id] ?? [];
 
-              return (
+  const analisis =
+    analisisPorSolicitud[solicitud.id];
+
+  return (
                 <article
                   key={solicitud.id}
                   className="rounded-3xl border border-neutral-200 bg-white p-6 md:p-8 shadow-sm"
@@ -531,7 +678,159 @@ export default function AprobacionesEppPage() {
                       </div>
                     )}
                   </div>
+                  <div className="mt-8 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="text-lg font-black text-blue-950">
+                          Análisis asistido por IA
+                        </h3>
 
+                        <p className="mt-1 text-sm leading-relaxed text-blue-800">
+                          La IA analiza únicamente la evidencia visual como
+                          apoyo al aprobador. No aprueba ni rechaza la solicitud
+                          y no reemplaza la evaluación humana.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          analizarConIA(solicitud.id)
+                        }
+                        disabled={
+                          fotos.length < 3 ||
+                          analizandoId === solicitud.id ||
+                          procesandoId === solicitud.id
+                        }
+                        className="shrink-0 rounded-xl bg-blue-700 px-5 py-3 font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {analizandoId === solicitud.id
+                          ? "Analizando imágenes..."
+                          : analisis
+                            ? "Analizar nuevamente"
+                            : "Analizar con IA"}
+                      </button>
+                    </div>
+
+                    {fotos.length < 3 && (
+                      <p className="mt-3 text-sm font-semibold text-amber-700">
+                        Se requieren mínimo 3 fotografías para realizar el
+                        análisis asistido por IA.
+                      </p>
+                    )}
+
+                   {analisis && (
+  <div className="mt-5 space-y-4 border-t border-blue-200 pt-5">
+    <div>
+      <div className="text-xs font-black uppercase tracking-wide text-blue-700">
+        Resumen del análisis
+      </div>
+
+      <p className="mt-2 text-sm leading-relaxed text-neutral-800">
+        {analisis.resumen || "Sin resumen disponible."}
+      </p>
+    </div>
+
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <Dato
+        titulo="Severidad visible"
+        valor={analisis.severidad_visible || "NO DETERMINABLE"}
+      />
+
+      <Dato
+        titulo="Calidad de la evidencia"
+        valor={analisis.calidad_evidencia || "NO DETERMINABLE"}
+      />
+    </div>
+
+    {analisis.hallazgos &&
+      analisis.hallazgos.length > 0 && (
+        <div>
+          <div className="text-xs font-black uppercase tracking-wide text-neutral-500">
+            Hallazgos visibles
+          </div>
+
+          <div className="mt-2 space-y-2">
+            {analisis.hallazgos.map((hallazgo, index) => (
+              <div
+                key={index}
+                className="rounded-xl border border-blue-100 bg-white p-3"
+              >
+                <div className="text-sm font-bold text-neutral-900">
+                  {hallazgo.tipo || `Hallazgo ${index + 1}`}
+                </div>
+
+                <p className="mt-1 text-sm text-neutral-700">
+                  {hallazgo.descripcion || "Sin descripción."}
+                </p>
+
+                {hallazgo.imagen_referencia && (
+                  <div className="mt-1 text-xs font-semibold text-neutral-500">
+                    Imagen: {hallazgo.imagen_referencia}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+    {analisis.consistencia_imagenes && (
+      <div>
+        <div className="text-xs font-black uppercase tracking-wide text-neutral-500">
+          Consistencia entre imágenes
+        </div>
+
+        <p className="mt-1 text-sm leading-relaxed text-neutral-800">
+          {analisis.consistencia_imagenes}
+        </p>
+      </div>
+    )}
+
+    {analisis.evaluacion_soporte && (
+      <div>
+        <div className="text-xs font-black uppercase tracking-wide text-neutral-500">
+          Evaluación del soporte
+        </div>
+
+        <p className="mt-1 text-sm leading-relaxed text-neutral-800">
+          {analisis.evaluacion_soporte}
+        </p>
+      </div>
+    )}
+
+    {analisis.recomendacion_apoyo && (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="text-xs font-black uppercase tracking-wide text-amber-800">
+          Recomendación de apoyo
+        </div>
+
+        <p className="mt-1 text-sm leading-relaxed text-amber-900">
+          {analisis.recomendacion_apoyo}
+        </p>
+      </div>
+    )}
+
+    {analisis.advertencias && (
+      <div className="rounded-xl border border-neutral-300 bg-white p-4">
+        <div className="text-xs font-black uppercase tracking-wide text-neutral-600">
+          Advertencias y limitaciones
+        </div>
+
+        <p className="mt-1 text-sm leading-relaxed text-neutral-700">
+          {analisis.advertencias}
+        </p>
+      </div>
+    )}
+
+    <p className="text-xs font-semibold text-blue-800">
+      Este análisis es únicamente una herramienta de apoyo. La aprobación
+      o rechazo de la reposición corresponde exclusivamente al responsable
+      autorizado.
+    </p>
+  </div>
+)}
+                  </div>
                   <div className="mt-8 border-t border-neutral-200 pt-6">
                     <label className="mb-2 block text-sm font-bold">
                       Motivo del rechazo
