@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import * as XLSX from "xlsx";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -125,7 +126,8 @@ export default function HeightEquipmentPage() {
   const [saving, setSaving] = useState(false);
   const [uiInfo, setUiInfo] = useState("");
   const [uiError, setUiError] = useState("");
-  const [viewMode, setViewMode] = useState<"menu" | "new" | "list">("menu");
+  const [viewMode, setViewMode] =
+  useState<"menu" | "dashboard" | "new" | "list">("menu");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPassword, setEditPassword] = useState("");
   const [pendingEditItem, setPendingEditItem] = useState<Equipment | null>(
@@ -135,6 +137,7 @@ const [searchTerm, setSearchTerm] = useState("");
 const [locationFilter, setLocationFilter] = useState("");
 const [operationalStatusFilter, setOperationalStatusFilter] = useState("");
 const [certificationFilter, setCertificationFilter] = useState("");
+const [exportOption, setExportOption] = useState("ALL");
 
   function updateField(key: string, value: any) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -407,7 +410,117 @@ function getCertificationFilterValue(expiryDate: string) {
   if (cert.label.includes("VIGENTE")) return "VIGENTE";
   return "SIN_FECHA";
 }
+function exportToExcel() {
+  let dataToExport = [...equipment];
+  let reportName = "Inventario_Completo";
 
+  if (exportOption === "EXPIRED") {
+    dataToExport = equipment.filter(
+      (item) =>
+        getCertificationFilterValue(item.certification_expiry_date) ===
+        "VENCIDA"
+    );
+    reportName = "Certificaciones_Vencidas";
+  }
+
+  if (exportOption === "EXPIRING") {
+    dataToExport = equipment.filter(
+      (item) =>
+        getCertificationFilterValue(item.certification_expiry_date) ===
+        "POR_VENCER"
+    );
+    reportName = "Certificaciones_Proximas_a_Vencer";
+  }
+
+  if (exportOption === "IN_SERVICE") {
+    dataToExport = equipment.filter(
+      (item) => item.status === "IN_SERVICE"
+    );
+    reportName = "Equipos_En_Servicio";
+  }
+
+  if (exportOption === "OUT_OF_SERVICE") {
+    dataToExport = equipment.filter(
+      (item) => item.status === "OUT_OF_SERVICE"
+    );
+    reportName = "Equipos_Fuera_de_Servicio";
+  }
+
+  const rows = dataToExport.map((item) => ({
+    "Código equipo": item.equipment_code || "",
+    "Código interno": item.internal_code || "",
+    "Nombre del elemento": item.equipment_name || "",
+    "Categoría": item.category || "",
+    "Marca": item.brand || "",
+    "Modelo": item.model || "",
+    "Número de serie": item.serial_number || "",
+    "Unidad WS": item.well_services_unit || "",
+    "Ubicación": item.location || "",
+    "Estado operativo":
+      item.status === "OUT_OF_SERVICE"
+        ? "FUERA DE SERVICIO"
+        : "EN SERVICIO",
+    "Fecha puesta en servicio": item.service_start_date || "",
+    "Última certificación": item.last_certification_date || "",
+    "Vigencia (meses)": item.certification_validity_months || "",
+    "Fecha de vencimiento": item.certification_expiry_date || "",
+    "Estado certificación":
+      getCertificationFilterValue(item.certification_expiry_date) === "VENCIDA"
+        ? "VENCIDA"
+        : getCertificationFilterValue(item.certification_expiry_date) ===
+          "POR_VENCER"
+        ? "PRÓXIMA A VENCER"
+        : getCertificationFilterValue(item.certification_expiry_date) ===
+          "VIGENTE"
+        ? "VIGENTE"
+        : "SIN FECHA",
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+
+  worksheet["!cols"] = [
+    { wch: 18 },
+    { wch: 18 },
+    { wch: 32 },
+    { wch: 24 },
+    { wch: 20 },
+    { wch: 18 },
+    { wch: 22 },
+    { wch: 16 },
+    { wch: 28 },
+    { wch: 20 },
+    { wch: 22 },
+    { wch: 22 },
+    { wch: 18 },
+    { wch: 22 },
+    { wch: 24 },
+  ];
+
+  const workbook = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    worksheet,
+    "Equipos"
+  );
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  XLSX.writeFile(
+    workbook,
+    `${reportName}_${today}.xlsx`
+  );
+}
+function openFilteredEquipment(
+  operationalStatus = "",
+  certificationStatus = ""
+) {
+  setSearchTerm("");
+  setLocationFilter("");
+  setOperationalStatusFilter(operationalStatus);
+  setCertificationFilter(certificationStatus);
+  setViewMode("list");
+}
 const filteredEquipment = equipment.filter((item) => {
   const term = searchTerm.trim().toLowerCase();
 
@@ -488,8 +601,8 @@ const filteredEquipment = equipment.filter((item) => {
           </div>
         )}
 
-        {viewMode === "menu" && (
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+       {viewMode === "menu" && (
+  <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
               type="button"
               onClick={() => {
@@ -499,6 +612,9 @@ const filteredEquipment = equipment.filter((item) => {
               }}
               className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
             >
+<div className="text-4xl mb-4">
+  🦺
+</div>
               <div className="text-2xl font-bold">
                 Incluir nuevo elemento
               </div>
@@ -514,6 +630,9 @@ const filteredEquipment = equipment.filter((item) => {
               onClick={() => setViewMode("list")}
               className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
             >
+<div className="text-4xl mb-4">
+  📋
+</div>
               <div className="text-2xl font-bold">
                 Revisar hojas de vida
               </div>
@@ -523,8 +642,425 @@ const filteredEquipment = equipment.filter((item) => {
                 vencimientos.
               </div>
             </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("dashboard")}
+              className="border rounded-2xl p-6 bg-white shadow-sm text-left hover:shadow-md transition"
+            >
+<div className="text-4xl mb-4">
+  📊
+</div>
+              <div className="text-2xl font-bold">
+                Dashboard
+              </div>
+
+              <div className="text-sm text-neutral-600 mt-2">
+                Consultar indicadores, estado operativo, certificaciones,
+                vencimientos y distribución de los elementos.
+              </div>
+            </button>
           </section>
         )}
+        {viewMode === "dashboard" && (() => {
+          const total = equipment.length;
+
+          const inService = equipment.filter(
+            (item) => item.status === "IN_SERVICE"
+          ).length;
+
+          const outOfService = equipment.filter(
+            (item) => item.status === "OUT_OF_SERVICE"
+          ).length;
+
+          const vigente = equipment.filter(
+            (item) =>
+              getCertificationFilterValue(item.certification_expiry_date) ===
+              "VIGENTE"
+          ).length;
+
+          const porVencer = equipment.filter(
+            (item) =>
+              getCertificationFilterValue(item.certification_expiry_date) ===
+              "POR_VENCER"
+          ).length;
+
+          const vencida = equipment.filter(
+            (item) =>
+              getCertificationFilterValue(item.certification_expiry_date) ===
+              "VENCIDA"
+          ).length;
+
+          return (
+            <section className="space-y-6">
+
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h2 className="text-2xl font-bold">
+                    Dashboard Trabajo en Alturas
+                  </h2>
+
+                  <p className="text-sm text-neutral-600 mt-1">
+                    Estado general de los elementos de protección contra caídas.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+
+  <select
+    value={exportOption}
+    onChange={(e) => setExportOption(e.target.value)}
+    className="border rounded-lg px-3 py-2 text-sm bg-white"
+  >
+    <option value="ALL">Inventario completo</option>
+    <option value="EXPIRED">Certificaciones vencidas</option>
+    <option value="EXPIRING">Próximas a vencer</option>
+    <option value="IN_SERVICE">Equipos en servicio</option>
+    <option value="OUT_OF_SERVICE">Equipos fuera de servicio</option>
+  </select>
+
+  <button
+    type="button"
+    onClick={exportToExcel}
+    className="bg-green-700 hover:bg-green-800 text-white rounded-lg px-4 py-2 text-sm font-semibold transition"
+  >
+    ↓ Descargar Excel
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setViewMode("menu")}
+    className="border rounded-lg px-4 py-2 text-sm bg-white"
+  >
+    ← Volver al menú
+  </button>
+
+</div>
+              </div>
+
+<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+
+  <button
+    type="button"
+    onClick={() => openFilteredEquipment()}
+    className="border rounded-xl p-4 bg-blue-50 text-left hover:shadow-md hover:-translate-y-0.5 transition cursor-pointer"
+  >
+    <div className="text-sm text-blue-900 font-medium">
+      Total elementos
+    </div>
+    <div className="text-3xl font-bold text-blue-950 mt-2">
+      {total}
+    </div>
+    <div className="text-xs text-blue-700 mt-2">
+      Ver elementos →
+    </div>
+  </button>
+
+  <button
+    type="button"
+    onClick={() => openFilteredEquipment("IN_SERVICE")}
+    className="border rounded-xl p-4 bg-green-50 text-left hover:shadow-md hover:-translate-y-0.5 transition cursor-pointer"
+  >
+    <div className="text-sm text-green-800 font-medium">
+      En servicio
+    </div>
+    <div className="text-3xl font-bold text-green-800 mt-2">
+      {inService}
+    </div>
+    <div className="text-xs text-green-700 mt-2">
+      Ver elementos →
+    </div>
+  </button>
+
+  <button
+    type="button"
+    onClick={() => openFilteredEquipment("OUT_OF_SERVICE")}
+    className="border rounded-xl p-4 bg-red-50 text-left hover:shadow-md hover:-translate-y-0.5 transition cursor-pointer"
+  >
+    <div className="text-sm text-red-800 font-medium">
+      Fuera de servicio
+    </div>
+    <div className="text-3xl font-bold text-red-800 mt-2">
+      {outOfService}
+    </div>
+    <div className="text-xs text-red-700 mt-2">
+      Ver elementos →
+    </div>
+  </button>
+
+  <button
+    type="button"
+    onClick={() => openFilteredEquipment("", "VIGENTE")}
+    className="border rounded-xl p-4 bg-emerald-50 text-left hover:shadow-md hover:-translate-y-0.5 transition cursor-pointer"
+  >
+    <div className="text-sm text-emerald-800 font-medium">
+      Cert. vigente
+    </div>
+    <div className="text-3xl font-bold text-emerald-800 mt-2">
+      {vigente}
+    </div>
+    <div className="text-xs text-emerald-700 mt-2">
+      Ver elementos →
+    </div>
+  </button>
+
+  <button
+    type="button"
+    onClick={() => openFilteredEquipment("", "POR_VENCER")}
+    className="border rounded-xl p-4 bg-amber-50 text-left hover:shadow-md hover:-translate-y-0.5 transition cursor-pointer"
+  >
+    <div className="text-sm text-amber-800 font-medium">
+      Próximos a vencer
+    </div>
+    <div className="text-3xl font-bold text-amber-800 mt-2">
+      {porVencer}
+    </div>
+    <div className="text-xs text-amber-700 mt-2">
+      Ver elementos →
+    </div>
+  </button>
+
+  <button
+    type="button"
+    onClick={() => openFilteredEquipment("", "VENCIDA")}
+    className="border rounded-xl p-4 bg-neutral-900 text-white text-left hover:shadow-md hover:-translate-y-0.5 transition cursor-pointer"
+  >
+    <div className="text-sm font-medium">
+      Cert. vencida
+    </div>
+    <div className="text-3xl font-bold mt-2">
+      {vencida}
+    </div>
+    <div className="text-xs text-neutral-300 mt-2">
+      Ver elementos →
+    </div>
+  </button>
+
+</div>
+             
+              <div className="border rounded-xl p-5 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+                  <div>
+                    <h3 className="text-lg font-bold">
+                      Distribución por unidad / ubicación
+                    </h3>
+
+                    <p className="text-sm text-neutral-500">
+                      Cantidad de elementos registrados por unidad operativa.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {Object.entries(
+                    equipment.reduce<Record<string, number>>((acc, item) => {
+                      const unit =
+                        item.well_services_unit ||
+                        item.location ||
+                        "Sin ubicación";
+
+                      acc[unit] = (acc[unit] || 0) + 1;
+
+                      return acc;
+                    }, {})
+                  )
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([unit, count]) => (
+                      <div key={unit}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium">{unit}</span>
+
+                          <span className="font-bold">
+                            {count}
+                          </span>
+                        </div>
+
+                        <div className="w-full h-3 bg-neutral-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-3 bg-blue-900 rounded-full"
+                            style={{
+                              width: `${
+                                total > 0
+                                  ? Math.max((count / total) * 100, 2)
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                {/* CERTIFICACIONES VENCIDAS */}
+                <div className="border rounded-xl bg-white shadow-sm overflow-hidden">
+                  <div className="p-5 border-b bg-red-50">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-red-800">
+                          Certificaciones vencidas
+                        </h3>
+                        <p className="text-sm text-red-700">
+                          Elementos que requieren revisión prioritaria.
+                        </p>
+                      </div>
+
+                      <div className="text-2xl font-bold text-red-800">
+                        {vencida}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="divide-y max-h-[420px] overflow-y-auto">
+                    {equipment
+                      .filter(
+                        (item) =>
+                          getCertificationFilterValue(
+                            item.certification_expiry_date
+                          ) === "VENCIDA"
+                      )
+                      .sort((a, b) =>
+                        String(b.certification_expiry_date || "").localeCompare(
+                          String(a.certification_expiry_date || "")
+                        )
+                      )
+                      .slice(0, 10)
+                      .map((item) => (
+                        <div key={item.id} className="p-4">
+                          <div className="flex justify-between gap-4">
+                            <div>
+                              <div className="font-semibold">
+                                {item.equipment_name || "Sin nombre"}
+                              </div>
+
+                              <div className="text-xs text-neutral-500 mt-1">
+                                Código:{" "}
+                                {item.equipment_code ||
+                                  item.internal_code ||
+                                  "—"}
+                              </div>
+
+                              <div className="text-xs text-neutral-500">
+                                {item.well_services_unit ||
+                                  item.location ||
+                                  "Sin ubicación"}
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className="text-xs text-neutral-500">
+                                Venció
+                              </div>
+
+                              <div className="text-sm font-bold text-red-700">
+                                {item.certification_expiry_date || "—"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                    {vencida === 0 && (
+                      <div className="p-5 text-sm text-neutral-500">
+                        No hay certificaciones vencidas.
+                      </div>
+                    )}
+                  </div>
+
+                  {vencida > 10 && (
+                    <div className="p-3 text-center text-xs text-neutral-500 border-t">
+                      Mostrando 10 de {vencida} certificaciones vencidas.
+                    </div>
+                  )}
+                </div>
+
+
+                {/* PRÓXIMAS A VENCER */}
+                <div className="border rounded-xl bg-white shadow-sm overflow-hidden">
+                  <div className="p-5 border-b bg-amber-50">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-amber-800">
+                          Próximas a vencer
+                        </h3>
+                        <p className="text-sm text-amber-700">
+                          Certificaciones con vencimiento dentro de 60 días.
+                        </p>
+                      </div>
+
+                      <div className="text-2xl font-bold text-amber-800">
+                        {porVencer}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="divide-y max-h-[420px] overflow-y-auto">
+                    {equipment
+                      .filter(
+                        (item) =>
+                          getCertificationFilterValue(
+                            item.certification_expiry_date
+                          ) === "POR_VENCER"
+                      )
+                      .sort((a, b) =>
+                        String(a.certification_expiry_date || "").localeCompare(
+                          String(b.certification_expiry_date || "")
+                        )
+                      )
+                      .slice(0, 10)
+                      .map((item) => (
+                        <div key={item.id} className="p-4">
+                          <div className="flex justify-between gap-4">
+                            <div>
+                              <div className="font-semibold">
+                                {item.equipment_name || "Sin nombre"}
+                              </div>
+
+                              <div className="text-xs text-neutral-500 mt-1">
+                                Código:{" "}
+                                {item.equipment_code ||
+                                  item.internal_code ||
+                                  "—"}
+                              </div>
+
+                              <div className="text-xs text-neutral-500">
+                                {item.well_services_unit ||
+                                  item.location ||
+                                  "Sin ubicación"}
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <div className="text-xs text-neutral-500">
+                                Vence
+                              </div>
+
+                              <div className="text-sm font-bold text-amber-700">
+                                {item.certification_expiry_date || "—"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                    {porVencer === 0 && (
+                      <div className="p-5 text-sm text-neutral-500">
+                        No hay certificaciones próximas a vencer.
+                      </div>
+                    )}
+                  </div>
+
+                  {porVencer > 10 && (
+                    <div className="p-3 text-center text-xs text-neutral-500 border-t">
+                      Mostrando 10 de {porVencer} certificaciones próximas a vencer.
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </section>
+          );
+        })()}
 
         {viewMode === "new" && (
           <section className="border rounded-xl p-4 space-y-4 bg-white shadow-sm">
