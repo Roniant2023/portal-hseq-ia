@@ -25,7 +25,7 @@ const companyIcon =
 export const metadata: Metadata = {
   title: "Portal HSEQ IA",
   description: "Portal inteligente para gestión HSEQ",
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: companyIcon,
     apple: companyIcon,
