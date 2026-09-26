@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import "jspdf-autotable";
+import { getCompanyConfig } from "@/lib/company-config";
 type Option = {
   label: string;
   score: number;
@@ -116,7 +117,12 @@ function getRiskResult(total: number, hoursScore: number) {
 }
 
 export default function GestionViajesPage() {
-  const logoSrc = "/logo-eies.png";
+  const company = getCompanyConfig();
+
+  const logoSrc =
+    company.id === "pegasso"
+      ? "/icons/seguridad-vial-pegasso.png"
+      : "/logo-eies.png";
   const driverCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const pdfRef = useRef<HTMLDivElement | null>(null);
 

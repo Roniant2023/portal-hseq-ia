@@ -1,5 +1,5 @@
 import Image from "next/image";
-
+import { getCompanyConfig } from "@/lib/company-config";
 const environmentalModules = [
   {
     title: "Huella de Carbono",
@@ -36,6 +36,8 @@ const environmentalModules = [
 ];
 
 export default function AmbientalPage() {
+  const company = getCompanyConfig();
+
   return (
     <main className="min-h-screen bg-white text-neutral-900">
       <div className="max-w-6xl mx-auto px-6 py-10 space-y-10">
@@ -51,13 +53,21 @@ export default function AmbientalPage() {
           </div>
 
           <Image
-            src="/logo-eies.png"
-            alt="Logo Estrella"
-            width={220}
-            height={80}
-            className="h-20 w-auto object-contain"
-            priority
-          />
+  src={
+    company.id === "pegasso"
+      ? "/icons/ambiental-pegasso.png"
+      : "/logo-eies.png"
+  }
+  alt={company.id === "pegasso" ? "Programa Ambiental" : "Logo Estrella"}
+  width={220}
+  height={160}
+  className={
+    company.id === "pegasso"
+      ? "h-28 w-auto object-contain"
+      : "h-20 w-auto object-contain"
+  }
+  priority
+/>
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-2 gap-8">

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { getCompanyConfig } from "@/lib/company-config";
 
 type PermisoModulo = {
   modulo: string;
@@ -42,6 +43,7 @@ const tools = [
 ];
 
 export default function ControlTrabajoPage() {
+const company = getCompanyConfig();
   const [permisos, setPermisos] = useState<PermisoModulo[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -91,7 +93,11 @@ export default function ControlTrabajoPage() {
           </div>
 
           <Image
-            src="/icons/control-trabajo.png"
+            src={
+  company.id === "pegasso"
+    ? "/icons/control-trabajo-pegasso.png"
+    : "/icons/control-trabajo.png"
+}
             alt="Control de Trabajo"
             width={220}
             height={160}

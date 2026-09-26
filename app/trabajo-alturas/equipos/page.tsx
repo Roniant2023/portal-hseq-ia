@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
+import { getCompanyConfig } from "@/lib/company-config";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -115,6 +116,8 @@ const WELL_SERVICES_UNITS = [
 ];
 
 export default function HeightEquipmentPage() {
+  const company = getCompanyConfig();
+
   const [form, setForm] = useState(emptyForm);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [mainPhoto, setMainPhoto] = useState<File | null>(null);
@@ -583,10 +586,18 @@ const filteredEquipment = equipment.filter((item) => {
           </div>
 
           <img
-            src="/logo-eies.png"
-            alt="Logo Estrella"
-            className="h-20 w-auto"
-          />
+  src={
+    company.id === "pegasso"
+      ? "/icons/trabajo-alturas-pegasso.png"
+      : "/logo-eies.png"
+  }
+  alt={company.id === "pegasso" ? "Trabajo en Alturas" : "Logo Estrella"}
+  className={
+    company.id === "pegasso"
+      ? "h-28 w-auto object-contain"
+      : "h-20 w-auto"
+  }
+/>
         </header>
 
         {(uiError || uiInfo) && (
