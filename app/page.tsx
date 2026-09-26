@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import UserSessionBar from "./components/UserSessionBar";
 import { supabase } from "@/lib/supabase";
-
+import { getCompanyConfig } from "@/lib/company-config";
 type PermisoModulo = {
   modulo: string;
   puede_ver: boolean;
@@ -17,52 +17,54 @@ type PerfilPortal = {
   activo: boolean | null;
 };
 
-const programs = [
-  {
-    title: "Control de Trabajo",
-    icon: "/icons/control-trabajo.png",
-    href: "/control-trabajo",
-    external: false,
-    modulos: ["EPP", "ATS", "SOE", "INSPECCIONES"],
-  },
-  {
-    title: "Trabajo en Alturas",
-    icon: "/icons/trabajo-alturas.png",
-    href: "/trabajo-alturas/equipos",
-    external: false,
-    modulos: ["ALTURAS"],
-  },
-  {
-    title: "Salud",
-    icon: "/icons/salud.png",
-    href: "#",
-    external: false,
-    modulos: ["SALUD"],
-  },
-  {
-    title: "Ambiental",
-    icon: "/icons/ambiental.png",
-    href: "/ambiental",
-    external: false,
-    modulos: ["AMBIENTAL"],
-  },
-  {
-    title: "Seguridad Vial",
-    icon: "/icons/seguridad-vial.png",
-    href: "/gestion-viajes",
-    external: false,
-    modulos: ["SEGURIDAD_VIAL"],
-  },
-  {
-    title: "Espacios Confinados",
-    icon: "/icons/espacios-confinados.png",
-    href: "#",
-    external: false,
-    modulos: ["ESPACIOS_CONFINADOS"],
-  },
-];
+
 
 export default function Home() {
+  const company = getCompanyConfig();
+  const programs = [
+    {
+      title: "Control de Trabajo",
+      icon: company.icons.controlTrabajo,
+      href: "/control-trabajo",
+      external: false,
+      modulos: ["EPP", "ATS", "SOE", "INSPECCIONES"],
+    },
+    {
+      title: "Trabajo en Alturas",
+      icon: company.icons.trabajoAlturas,
+      href: "/trabajo-alturas/equipos",
+      external: false,
+      modulos: ["ALTURAS"],
+    },
+    {
+      title: "Salud",
+      icon: company.icons.salud,
+      href: "#",
+      external: false,
+      modulos: ["SALUD"],
+    },
+    {
+      title: "Ambiental",
+      icon: company.icons.ambiental,
+      href: "/ambiental",
+      external: false,
+      modulos: ["AMBIENTAL"],
+    },
+    {
+      title: "Seguridad Vial",
+      icon: company.icons.seguridadVial,
+      href: "/gestion-viajes",
+      external: false,
+      modulos: ["SEGURIDAD_VIAL"],
+    },
+    {
+      title: "Espacios Confinados",
+      icon: company.icons.espaciosConfinados,
+      href: "#",
+      external: false,
+      modulos: ["ESPACIOS_CONFINADOS"],
+    },
+  ];
   const [permisos, setPermisos] = useState<PermisoModulo[]>([]);
   const [cargandoPermisos, setCargandoPermisos] = useState(true);
   const [esAdmin, setEsAdmin] = useState(false);
@@ -158,14 +160,18 @@ export default function Home() {
             )}
           </div>
 
-          <Image
-            src="/logo-eies.png"
-            alt="Logo Estrella"
-            width={220}
-            height={80}
-            className="h-20 w-auto object-contain"
-            priority
-          />
+      <Image
+  src={company.logo}
+  alt={`Logo ${company.shortName}`}
+  width={company.id === "pegasso" ? 300 : 220}
+  height={company.id === "pegasso" ? 180 : 80}
+  className={
+    company.id === "pegasso"
+      ? "h-40 w-auto object-contain mr-30"
+    : "h-20 w-auto object-contain"
+  }
+  priority
+/>
         </header>
 
         {cargandoPermisos ? (

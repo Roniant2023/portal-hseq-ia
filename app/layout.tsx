@@ -14,13 +14,21 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const company =
+  process.env.NEXT_PUBLIC_COMPANY?.toLowerCase() || "estrella";
+
+const companyIcon =
+  company === "pegasso"
+    ? "/icon-pegasso.png"
+    : "/icon-estrella.png";
+
 export const metadata: Metadata = {
   title: "Portal HSEQ IA",
   description: "Portal inteligente para gestión HSEQ",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon-192.png",
-    apple: "/icon-192.png",
+    icon: companyIcon,
+    apple: companyIcon,
   },
 };
 
