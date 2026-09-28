@@ -16,7 +16,7 @@ const tools = [
     title: "ATS Digital",
     description:
       "Análisis de Trabajo Seguro con apoyo de inteligencia artificial.",
-    href: "https://ats-piloto-eies.vercel.app",
+    href: "/control-trabajo/ats",
     modulo: "ATS",
   },
   {

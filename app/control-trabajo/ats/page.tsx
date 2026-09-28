@@ -1,0 +1,3637 @@
+"use client";
+
+import React, { useMemo, useRef, useState, useEffect } from "react";
+import { useReactToPrint } from "react-to-print";
+import SignaturePadField from "./components/SignaturePadField";
+import { getCompanyConfig } from "@/lib/company-config";
+
+/* =========================
+   TIPOS
+========================= */
+type ProcedureRef = {
+  title?: string;
+  code?: string;
+  origin?: string;
+  parseable?: boolean;
+  [key: string]: any;
+};
+
+type ProcedureResult = {
+  ok: boolean;
+  fileName: string;
+  procedure?: ProcedureRef;
+  error?: string;
+  details?: string;
+};
+
+type Environment = {
+  timeOfDay?: string | null;
+  weather?: string | null;
+  temperatureC?: number | null;
+  humidityPct?: number | null;
+  wind?: string | null;
+  lighting?: string | null;
+  terrain?: string | null;
+  visibility?: string | null;
+};
+
+type ATSStopWork = {
+  decision: "STOP" | "CONTINUE" | "REVIEW_REQUIRED";
+  auto_triggers: string[];
+  criteria: string[];
+  rationale: string;
+};
+
+type ATSProcedureMini = { title: string; code: string; origin: string };
+
+type ATSProcedureInfluence = {
+  applied: ATSProcedureMini[];
+  not_parseable: ATSProcedureMini[];
+  derived_controls: Array<{
+    level: "engineering" | "administrative" | "ppe";
+    control: string;
+    source: ATSProcedureMini;
+  }>;
+};
+
+type ATSChecklistDecisionHint = "STOP" | "REVIEW_REQUIRED" | "CONTINUE";
+
+type ATSChecklistAction = {
+  priority: "critical" | "high" | "medium" | "low";
+  category: "administrative" | "engineering" | "ppe";
+  action: string;
+  evidence: string[];
+};
+
+type ATSChecklistActions = {
+  decision_hint: ATSChecklistDecisionHint;
+  missing: string[];
+  critical_fails: string[];
+  derived_controls: {
+    engineering: string[];
+    administrative: string[];
+    ppe: string[];
+  };
+  actions: ATSChecklistAction[];
+  snapshot: any;
+};
+
+type ATS = {
+  meta: {
+    title: string;
+    company: string;
+    location: string;
+    date: string;
+    shift: string;
+  };
+  environment: any;
+  hazards: string[];
+  controls: {
+    engineering: string[];
+    administrative: string[];
+    ppe: string[];
+  };
+  steps: Array<{ step: string; hazards: string[]; controls: string[] }>;
+  stop_work: ATSStopWork;
+  procedure_refs_used: ATSProcedureMini[];
+  procedure_influence: ATSProcedureInfluence;
+  checklist_actions?: ATSChecklistActions;
+};
+
+type LessonLearnedBrief = {
+  title: string;
+  code: string;
+  origin: string;
+  parseable: boolean;
+  brief: {
+    scope: string;
+    mandatory_permits: string[];
+    critical_controls: {
+      engineering: string[];
+      administrative: string[];
+      ppe: string[];
+    };
+    stop_work: string[];
+    mandatory_steps: string[];
+    restrictions: string[];
+  };
+};
+
+type LessonLearnedApiResponse = {
+  lesson: any;
+  lesson_learned_brief: LessonLearnedBrief;
+};
+
+type ATSHistoryItem = {
+  id: string;
+  created_at: string;
+  job_title: string | null;
+  company: string | null;
+  location: string | null;
+  work_date: string | null;
+  shift: string | null;
+  stop_work_decision: string | null;
+  hazards_count: number | null;
+  controls_count: number | null;
+};
+
+type ApproverOption = {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+};
+
+/* =========================
+   UTILS
+========================= */
+function clsx(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(" ");
+}
+
+function formatDateEsCOFromISO(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+}
+
+function cleanString(v: any): string | null {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s.length ? s : null;
+}
+
+function cleanNumber(v: any): number | null {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function sanitizeEnvironment(env: Environment): Environment {
+  return {
+    timeOfDay: cleanString(env.timeOfDay),
+    weather: cleanString(env.weather),
+    wind: cleanString(env.wind),
+    lighting: cleanString(env.lighting),
+    terrain: cleanString(env.terrain),
+    visibility: cleanString(env.visibility),
+    temperatureC: cleanNumber(env.temperatureC),
+    humidityPct: cleanNumber(env.humidityPct),
+  };
+}
+
+function isPdfOrDocx(file: File) {
+  const name = file.name.toLowerCase();
+  return name.endsWith(".pdf") || name.endsWith(".docx");
+}
+
+function fileKey(f: File) {
+  return `${f.name}__${f.size}`;
+}
+
+function safeJsonParse<T = any>(
+  text: string
+): { ok: true; value: T } | { ok: false; error: string } {
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+}
+
+function badgeForDecision(decision?: string) {
+  if (decision === "STOP") return { label: "STOP WORK", cls: "bg-red-600 text-white" };
+  if (decision === "REVIEW_REQUIRED") {
+    return { label: "REVISIÓN REQUERIDA", cls: "bg-amber-500 text-black" };
+  }
+  return { label: "CONTINUAR", cls: "bg-green-600 text-white" };
+}
+
+function sectionColorForDecision(decision?: string) {
+  if (decision === "STOP") return "border-red-300 bg-red-50";
+  if (decision === "REVIEW_REQUIRED") return "border-amber-300 bg-amber-50";
+  return "border-green-300 bg-green-50";
+}
+
+function miniLabel(p: { title?: string; code?: string; origin?: string }) {
+  const t = (p.title || "Procedimiento").trim();
+  const c = (p.code || "").trim();
+  const o = (p.origin || "").trim();
+  return `${t}${c ? ` (${c})` : ""}${o ? ` — ${o}` : ""}`;
+}
+
+function uniqueNonEmpty(arr: any): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const src = Array.isArray(arr) ? arr : [];
+  for (const x of src) {
+    const s = String(x ?? "").trim();
+    if (!s) continue;
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+}
+
+function toggleInArray(list: string[], value: string) {
+  const exists = list.includes(value);
+  return exists ? list.filter((x) => x !== value) : [...list, value];
+}
+
+/* =========================
+   HELPERS CHECKLIST
+========================= */
+function badgeForChecklistHint(decision?: string) {
+  if (decision === "STOP") return { label: "STOP WORK", cls: "bg-red-600 text-white" };
+  if (decision === "REVIEW_REQUIRED") {
+    return { label: "REVISIÓN REQUERIDA", cls: "bg-amber-500 text-black" };
+  }
+  return { label: "CONTINUAR", cls: "bg-green-600 text-white" };
+}
+
+function sortChecklistActions(list: ATSChecklistAction[]) {
+  const order: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  return [...(list || [])].sort((a, b) => (order[a.priority] ?? 99) - (order[b.priority] ?? 99));
+}
+
+function pillForPriority(p: ATSChecklistAction["priority"]) {
+  if (p === "critical") return { label: "CRÍTICO", cls: "bg-red-600 text-white border-red-700" };
+  if (p === "high") return { label: "ALTO", cls: "bg-orange-500 text-black border-orange-600" };
+  if (p === "medium") return { label: "MEDIO", cls: "bg-amber-300 text-black border-amber-400" };
+  return { label: "BAJO", cls: "bg-slate-200 text-black border-slate-300" };
+}
+
+function pillForCategory(c: ATSChecklistAction["category"]) {
+  if (c === "engineering") {
+    return { label: "Ingeniería", cls: "bg-indigo-50 text-indigo-900 border-indigo-200" };
+  }
+  if (c === "administrative") {
+    return { label: "Administrativo", cls: "bg-blue-50 text-blue-900 border-blue-200" };
+  }
+  return { label: "EPP", cls: "bg-emerald-50 text-emerald-900 border-emerald-200" };
+}
+
+function pillForDecisionHint(h?: string) {
+  if (h === "STOP") return { label: "STOP", cls: "bg-red-600 text-white" };
+  if (h === "REVIEW_REQUIRED") return { label: "REVISAR", cls: "bg-amber-500 text-black" };
+  return { label: "OK", cls: "bg-green-600 text-white" };
+}
+
+/* =========================
+   COMPONENTE CHECKLIST
+========================= */
+function ChecklistSection({
+  checklist,
+  companyName,
+}: {
+  checklist: ATSChecklistActions;
+  companyName: string;
+}) {
+  const hint = checklist?.decision_hint;
+  const hintBadge = badgeForChecklistHint(hint);
+  const hintPill = pillForDecisionHint(hint);
+
+  const missing = uniqueNonEmpty(checklist?.missing);
+  const criticalFails = uniqueNonEmpty(checklist?.critical_fails);
+
+  const derivedEng = uniqueNonEmpty(checklist?.derived_controls?.engineering);
+  const derivedAdm = uniqueNonEmpty(checklist?.derived_controls?.administrative);
+  const derivedPpe = uniqueNonEmpty(checklist?.derived_controls?.ppe);
+
+  const actionsSorted = sortChecklistActions(
+    Array.isArray(checklist?.actions) ? checklist.actions : []
+  );
+
+  return (
+    <section className="border rounded-xl p-4 md:p-5 bg-white shadow-sm space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+         <div className="text-xs text-neutral-500">
+  Checklist corporativo (Formato {companyName})
+</div>
+          <div className="text-lg font-semibold">Acciones y verificación</div>
+          <div className="text-sm text-neutral-700 mt-1">
+            Estado:{" "}
+            <span
+              className={clsx(
+                "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold",
+                hintPill.cls
+              )}
+            >
+              {hintPill.label}
+            </span>
+          </div>
+        </div>
+
+        <span className={clsx("px-3 py-1 rounded-full text-sm font-semibold", hintBadge.cls)}>
+          {hintBadge.label}
+        </span>
+      </div>
+
+      {(criticalFails.length > 0 || missing.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+            className={clsx(
+              "border rounded-lg p-3",
+              criticalFails.length ? "border-red-200 bg-red-50" : "border-neutral-200 bg-neutral-50"
+            )}
+          >
+            <div className="font-semibold text-sm flex items-center justify-between">
+              <span>Fallos críticos</span>
+              <span className="text-xs text-neutral-600">{criticalFails.length}</span>
+            </div>
+            {criticalFails.length === 0 ? (
+              <div className="text-sm text-neutral-600 mt-2">—</div>
+            ) : (
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1">
+                {criticalFails.map((x, i) => (
+                  <li key={i} className="text-red-900">
+                    {x}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div
+            className={clsx(
+              "border rounded-lg p-3",
+              missing.length ? "border-amber-200 bg-amber-50" : "border-neutral-200 bg-neutral-50"
+            )}
+          >
+            <div className="font-semibold text-sm flex items-center justify-between">
+              <span>Faltantes</span>
+              <span className="text-xs text-neutral-600">{missing.length}</span>
+            </div>
+            {missing.length === 0 ? (
+              <div className="text-sm text-neutral-600 mt-2">—</div>
+            ) : (
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1">
+                {missing.map((x, i) => (
+                  <li key={i} className="text-amber-900">
+                    {x}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="border rounded-lg p-3 bg-neutral-50">
+        <div className="font-semibold text-sm">Controles derivados del checklist</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+          <div className="border rounded-lg p-3 bg-white">
+            <div className="text-sm font-semibold">Ingeniería</div>
+            {derivedEng.length ? (
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1">
+                {derivedEng.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-sm text-neutral-600 mt-2">—</div>
+            )}
+          </div>
+          <div className="border rounded-lg p-3 bg-white">
+            <div className="text-sm font-semibold">Administrativos</div>
+            {derivedAdm.length ? (
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1">
+                {derivedAdm.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-sm text-neutral-600 mt-2">—</div>
+            )}
+          </div>
+          <div className="border rounded-lg p-3 bg-white">
+            <div className="text-sm font-semibold">EPP</div>
+            {derivedPpe.length ? (
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1">
+                {derivedPpe.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-sm text-neutral-600 mt-2">—</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="border rounded-lg p-3 bg-white">
+        <div className="flex items-center justify-between">
+          <div className="font-semibold text-sm">Acciones recomendadas</div>
+          <div className="text-xs text-neutral-600">{actionsSorted.length} acción(es)</div>
+        </div>
+
+        {actionsSorted.length === 0 ? (
+          <div className="text-sm text-neutral-600 mt-2">No hay acciones adicionales.</div>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {actionsSorted.map((a, i) => {
+              const pr = pillForPriority(a.priority);
+              const cat = pillForCategory(a.category);
+
+              return (
+                <li key={i} className="border rounded-lg p-3 bg-neutral-50">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span
+                      className={clsx(
+                        "text-[11px] font-semibold px-2 py-0.5 rounded-full border",
+                        pr.cls
+                      )}
+                    >
+                      {pr.label}
+                    </span>
+                    <span
+                      className={clsx(
+                        "text-[11px] font-semibold px-2 py-0.5 rounded-full border",
+                        cat.cls
+                      )}
+                    >
+                      {cat.label}
+                    </span>
+                  </div>
+
+                  <div className="text-sm text-neutral-900">{a.action}</div>
+
+                  {Array.isArray(a.evidence) && a.evidence.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs font-semibold text-neutral-600">Evidencia</div>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {uniqueNonEmpty(a.evidence).map((e, idx) => (
+                          <span
+                            key={idx}
+                            className="text-[11px] px-2 py-0.5 rounded-full border bg-white text-neutral-800"
+                          >
+                            {e}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+     <div className="text-xs text-neutral-500">
+  Nota: estas acciones se derivan del Formato {companyName} y reglas determinísticas; la IA solo
+  afina redacción y verificabilidad.
+</div>
+    </section>
+  );
+}
+
+/* =========================
+   CONSTANTES FORMATO CORPORATIVO
+========================= */
+const PELIGROS_TIPOS = [
+  "Físico",
+  "Químico",
+  "Biológico",
+  "Mecánico",
+  "Tecnológicos",
+  "Trabajo en alturas",
+  "Espacio Confinado",
+  "Locativo",
+  "Psicosocial",
+  "Biomecánico",
+  "Eléctrico",
+  "Objetos con potencial de caída",
+  "Otros",
+] as const;
+
+const PELIGROS_ENTORNO = [
+  "Instalaciones Aledañas",
+  "Operaciones Simultáneas",
+  "Condiciones del terreno",
+  "Clima",
+  "Otros",
+] as const;
+
+const EMERGENCIAS = [
+  "Incendio / Explosión",
+  "Descontrol de Pozos",
+  "Accidente vial",
+  "Afectación ambiental",
+  "Emergencia Médica",
+  "Orden Público",
+  "Desastre natural",
+  "Gas Sulfhídrico",
+] as const;
+
+const EQUIPO_SEGURIDAD = [
+  "Casco",
+  "Guantes",
+  "Mascara facial",
+  "Extintores / Matafuegos",
+  "Botas de seguridad",
+  "Protección Respiratoria",
+  "Antiparras/ oxicorte",
+  "Lockout/Layout/ EMN",
+  "Gafas de Seguridad",
+  "Arnés de Seguridad",
+  "Barreras",
+  "Kit herramientas para alturas",
+  "Protección Auditiva",
+  "Medición de gases",
+  "Señalización/Conos/Limitación de Área",
+  "Otros",
+] as const;
+
+const ACUERDOS_DE_VIDA = [
+  "1_Detención de tareas",
+  "2_Aislamiento de energía, bloqueo y etiquetado",
+  "3_Espacios confinados",
+  "4_Conducción segura",
+  "5_Trabajos en caliente",
+  "6_Línea de peligro",
+  "7_Izaje",
+  "8_Permiso de trabajo",
+  "9_Trabajo en altura",
+  "10_Salud pública",
+] as const;
+
+const APPROVERS: ApproverOption[] = [];
+
+/* =========================
+   COMPONENT
+========================= */
+export default function Page() {
+  const [jobTitle, setJobTitle] = useState("");
+  const [company, setCompany] = useState("");
+  const [location, setLocation] = useState("");
+  const [dateISO, setDateISO] = useState("");
+  const [shift, setShift] = useState("");
+  const [activityDescription, setActivityDescription] = useState("");
+  const [normReference, setNormReference] = useState("");
+  const companyConfig = getCompanyConfig();
+const companyLogoSrc = companyConfig.logo;
+const [searchCode, setSearchCode] = useState("");
+const [searchingATS, setSearchingATS] = useState(false);
+const [startMode, setStartMode] = useState<"new" | "load" | "">("");
+const [executantSignedCount, setExecutantSignedCount] = useState(0);
+const [executantRequiredCount, setExecutantRequiredCount] = useState(0);
+
+  const [environment, setEnvironment] = useState<Environment>({
+    timeOfDay: null,
+    weather: null,
+    temperatureC: null,
+    humidityPct: null,
+    wind: null,
+    lighting: null,
+    terrain: null,
+    visibility: null,
+  });
+
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [procedureRefs, setProcedureRefs] = useState<ProcedureRef[]>([]);
+  const [procedureResults, setProcedureResults] = useState<ProcedureResult[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const [generatingATS, setGeneratingATS] = useState(false);
+  const [savingATS, setSavingATS] = useState(false);
+  const [atsResult, setAtsResult] = useState<ATS | any>(null);
+
+  const [atsHistory, setAtsHistory] = useState<ATSHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
+
+  const [savedAtsId, setSavedAtsId] = useState<string | null>(null);
+  const [approverLink, setApproverLink] = useState("");
+const [executantSignLink, setExecutantSignLink] = useState("");
+const [creatingExecutantLink, setCreatingExecutantLink] = useState(false);
+const [executantSignLinks, setExecutantSignLinks] = useState<any[]>([]);
+  const [preparingApproverLink, setPreparingApproverLink] = useState(false);
+  const [sendingApprovalEmail, setSendingApprovalEmail] = useState(false);
+
+  const [uiError, setUiError] = useState<string | null>(null);
+  const [uiInfo, setUiInfo] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [openSteps, setOpenSteps] = useState<Record<number, boolean>>({});
+  function toggleStep(i: number) {
+    setOpenSteps((prev) => ({ ...prev, [i]: !prev[i] }));
+  }
+
+  const [atsNumber, setAtsNumber] = useState("");
+  const [permitNumber, setPermitNumber] = useState("");
+  const [elaborationDateISO, setElaborationDateISO] = useState("");
+  const [executionDateISO, setExecutionDateISO] = useState("");
+  const [formatVersion, setFormatVersion] = useState("");
+  const [procedureCodeRelated, setProcedureCodeRelated] = useState("");
+  const [workFront, setWorkFront] = useState("");
+
+  const [incidentsReference, setIncidentsReference] = useState<"Si" | "No" | "">("");
+  const [otherCompanies, setOtherCompanies] = useState<"Si" | "No" | "">("");
+
+  const [dangerTypes, setDangerTypes] = useState<string[]>([]);
+  const [dangerTypesOther, setDangerTypesOther] = useState("");
+
+  const [environmentDangers, setEnvironmentDangers] = useState<string[]>([]);
+  const [environmentDangersOther, setEnvironmentDangersOther] = useState("");
+
+  const [emergencies, setEmergencies] = useState<string[]>([]);
+
+  const [safetyEquipment, setSafetyEquipment] = useState<string[]>([]);
+  const [safetyEquipmentOther, setSafetyEquipmentOther] = useState("");
+
+  const [lifeSavingRules, setLifeSavingRules] = useState<string[]>([]);
+
+  const [executants, setExecutants] = useState<Array<{ name: string; signature: string }>>([
+    { name: "", signature: "" },
+    { name: "", signature: "" },
+    { name: "", signature: "" },
+  ]);
+
+  const [supervisorName, setSupervisorName] = useState("");
+  const [supervisorRole, setSupervisorRole] = useState("");
+  const [supervisorSignature, setSupervisorSignature] = useState("");
+
+  const [checkStagesClarity, setCheckStagesClarity] = useState<"SI" | "NO" | "N.A." | "">("");
+  const [checkHazardsControlled, setCheckHazardsControlled] = useState<"SI" | "NO" | "N.A." | "">("");
+  const [checkIsolationConfirmed, setCheckIsolationConfirmed] = useState<"SI" | "NO" | "N.A." | "">("");
+  const [checkCommsAgreed, setCheckCommsAgreed] = useState<"SI" | "NO" | "N.A." | "">("");
+  const [checkToolsOk, setCheckToolsOk] = useState<"SI" | "NO" | "N.A." | "">("");
+
+  const [selectedApproverId, setSelectedApproverId] = useState("");
+  const [approvers, setApprovers] = useState<ApproverOption[]>([]);
+  const [approverName, setApproverName] = useState("");
+  const [approverRole, setApproverRole] = useState("");
+  const [approverEmail, setApproverEmail] = useState("");
+  const [approverPhone, setApproverPhone] = useState("");
+  const [approverSignature, setApproverSignature] = useState("");
+
+  const lessonInputRef = useRef<HTMLInputElement | null>(null);
+  const [lessonFile, setLessonFile] = useState<File | null>(null);
+  const [lessonUploading, setLessonUploading] = useState(false);
+  const [lessonResult, setLessonResult] = useState<LessonLearnedApiResponse | null>(null);
+  const [savedAtsCode, setSavedAtsCode] = useState("");
+
+  function openLessonPicker() {
+    lessonInputRef.current?.click();
+  }
+
+  function clearLessonLearned() {
+    setLessonFile(null);
+    setLessonResult(null);
+  }
+
+  function handleUnlockAdminSections() {
+    setAdminAuthError(null);
+
+    const expected = process.env.NEXT_PUBLIC_ATS_ADMIN_PASSWORD;
+
+    if (!expected) {
+      setAdminAuthError("No se configuró la contraseña de acceso.");
+      return;
+    }
+
+    if (adminPassword.trim() !== expected) {
+      setAdminAuthError("Contraseña incorrecta.");
+      setAdminUnlocked(false);
+      return;
+    }
+
+    setAdminUnlocked(true);
+    setAdminAuthError(null);
+    setUiInfo("🔒 Acceso autorizado a historial y estadísticas.");
+  }
+
+  async function copyApproverLink() {
+    if (!approverLink) return;
+
+    try {
+      await navigator.clipboard.writeText(approverLink);
+      setUiInfo("🔗 Link copiado al portapapeles.");
+    } catch (err: any) {
+      setUiError(`No se pudo copiar el link: ${String(err?.message || err)}`);
+    }
+  }
+
+  async function sendApproverLinkByWhatsApp() {
+    if (!approverLink) return;
+
+    try {
+      const phone = approverPhone.replace(/\D/g, "");
+      const approver = approverName.trim() || "Aprobador";
+      const atsName = jobTitle.trim() || atsResult?.meta?.title || "ATS";
+
+      const message =
+        `Hola ${approver}, te comparto el link para revisar y firmar el ATS:\n\n` +
+        `Actividad: ${atsName}\n` +
+        `Link de aprobación: ${approverLink}`;
+
+      const whatsappUrl = phone
+        ? `https://wa.me/57${phone}?text=${encodeURIComponent(message)}`
+        : `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+
+      setUiInfo("📲 Se abrió WhatsApp para compartir el link de aprobación.");
+    } catch (err: any) {
+      setUiError(`No se pudo abrir WhatsApp: ${String(err?.message || err)}`);
+    }
+  }
+
+  async function sendApprovalLinkByEmail(token: string) {
+    setSendingApprovalEmail(true);
+
+    try {
+      const res = await fetch("/api/send-approval-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      const text = await res.text();
+      const parsed = safeJsonParse<any>(text);
+
+      if (!res.ok || !parsed.ok || !parsed.value?.ok) {
+        setUiError(`No se pudo enviar el link al correo del aprobador: ${text}`);
+        return false;
+      }
+
+      setUiInfo("✅ Link enviado al correo del aprobador.");
+      return true;
+    } catch (err: any) {
+      setUiError(`Excepción enviando link por correo: ${String(err?.message || err)}`);
+      return false;
+    } finally {
+      setSendingApprovalEmail(false);
+    }
+  }
+async function handlePrepareApproverLink() {
+    setUiError(null);
+    setUiInfo(null);
+
+    if (!savedAtsId) {
+      setUiError("Primero debes guardar el ATS para generar el link del aprobador.");
+      return;
+    }
+
+    if (!supervisorSignature) {
+      setUiError("Primero debe quedar registrada la firma del supervisor.");
+      return;
+    }
+
+    if (!approverName.trim()) {
+      setUiError("Debes seleccionar un aprobador.");
+      return;
+    }
+
+    if (!approverEmail.trim()) {
+      setUiError("El aprobador seleccionado no tiene correo configurado.");
+      return;
+    }
+
+    if (!approverPhone.trim()) {
+      setUiError("El aprobador seleccionado no tiene celular configurado.");
+      return;
+    }
+
+    setPreparingApproverLink(true);
+
+    try {
+      const res = await fetch("/api/create-approval-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ats_id: savedAtsId,
+          approver_name: approverName.trim(),
+          approver_role: approverRole.trim(),
+          approver_email: approverEmail.trim(),
+          approver_phone: approverPhone.trim(),
+        }),
+      });
+
+      const text = await res.text();
+      const parsed = safeJsonParse<any>(text);
+
+      if (!res.ok) {
+        setUiError(`Error generando link de aprobación (HTTP ${res.status}): ${text}`);
+        return;
+      }
+
+      if (!parsed.ok || !parsed.value?.ok) {
+        setUiError("No se pudo generar el link de aprobación.");
+        return;
+      }
+
+      const link =
+        parsed.value?.approval_url ||
+        parsed.value?.url ||
+        parsed.value?.link ||
+        "";
+
+      const token =
+        parsed.value?.token ||
+        "";
+
+      if (!link) {
+        setUiError("La respuesta no trajo un link de aprobación.");
+        return;
+      }
+
+      setApproverLink(link);
+
+      if (token) {
+const phone = approverPhone.replace(/\D/g, "");
+
+const message =
+  `Hola ${approverName}, te comparto el link para revisión y aprobación del ATS:\n\n` +
+  `Actividad: ${jobTitle || atsResult?.meta?.title || "ATS"}\n\n` +
+  `${link}`;
+
+const whatsappUrl = `https://wa.me/57${phone}?text=${encodeURIComponent(message)}`;
+
+window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+        const emailSent = await sendApprovalLinkByEmail(token);
+        if (emailSent) {
+          setUiInfo("✅ Link de aprobación generado y enviado al correo del aprobador.");
+        } else {
+          setUiInfo("✅ Link de aprobación generado correctamente.");
+        }
+      } else {
+        setUiInfo("✅ Link de aprobación generado correctamente.");
+      }
+    } catch (err: any) {
+      setUiError(`Excepción generando link de aprobación: ${String(err?.message || err)}`);
+    } finally {
+      setPreparingApproverLink(false);
+    }
+  }
+async function handleCreateExecutantSignLink() {
+  try {
+    setUiError(null);
+    setUiInfo(null);
+
+   let atsIdToUse = savedAtsId;
+
+if (!atsIdToUse) {
+  await handleSaveATS();
+
+  setUiInfo("ATS guardado. Vuelve a presionar el botón para generar los links de firma.");
+  return;
+}
+
+    setCreatingExecutantLink(true);
+
+    const res = await fetch("/api/create-executant-sign-link", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+  atsId: atsIdToUse,
+  executants,
+}),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data?.ok) {
+      setUiError(data?.error || "No fue posible generar links.");
+      return;
+    }
+
+    const links = Array.isArray(data?.links)
+      ? data.links
+      : [];
+
+    if (links.length === 0) {
+      setUiError("No se generaron links.");
+      return;
+    }
+
+    setExecutantSignLinks(links);
+setExecutantSignLink(links.map((x: any) => x.signUrl).join("\n"));
+
+if (links.length === 1) {
+  const item = links[0];
+  const phone = String(item.phone || "").replace(/\D/g, "");
+
+  const message =
+    `Hola ${item.name || ""}, por favor registra tu firma como ejecutante del ATS:\n\n${item.signUrl}`;
+
+  window.open(
+    `https://wa.me/57${phone}?text=${encodeURIComponent(message)}`,
+    "_blank",
+    "noopener,noreferrer"
+  );
+}
+
+setUiInfo(
+  links.length === 1
+    ? "✅ Link enviado al ejecutante."
+    : "✅ Links generados. Usa los botones individuales de WhatsApp."
+);
+  } catch (err: any) {
+    setUiError(err?.message || "Error generando links.");
+  } finally {
+    setCreatingExecutantLink(false);
+  }
+}
+async function refreshExecutantSignatures() {
+  try {
+    if (!savedAtsId) return;
+
+    const res = await fetch("/api/list-executant-signatures", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        atsId: savedAtsId,
+      }),
+    });
+
+    const json = await res.json();
+
+    if (!res.ok) {
+      console.error(json.error);
+      return;
+    }
+
+    const rows = Array.isArray(json.data) ? json.data : [];
+
+    const signedRows = rows.filter(
+      (r: any) => r.status === "signed"
+    );
+
+    setExecutantRequiredCount(rows.length);
+    setExecutantSignedCount(signedRows.length);
+
+    setExecutants((prev) =>
+      prev.map((ex) => {
+        const found = rows.find(
+  (r: any) =>
+    String(r.name || "").trim().toLowerCase() ===
+    String(ex.name || "").trim().toLowerCase()
+);
+
+        if (!found) return ex;
+
+        return {
+          ...ex,
+          remoteSigned: found.status === "signed",
+          remoteSignature: found.signature_data || "",
+        };
+      })
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+  async function uploadLessonLearned(file: File) {
+    setUiError(null);
+    setUiInfo(null);
+
+    if (!isPdfOrDocx(file)) {
+      setUiError("La lección aprendida debe ser PDF o DOCX.");
+      return;
+    }
+
+    setLessonUploading(true);
+    setLessonResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/lesson-learned-brief", {
+        method: "POST",
+        body: formData,
+      });
+
+      const text = await res.text();
+      if (!res.ok) {
+        setUiError(`Error en /api/lesson-learned-brief (HTTP ${res.status}): ${text}`);
+        return;
+      }
+
+      const parsed = safeJsonParse<any>(text);
+      if (!parsed.ok) {
+        setUiError(`Respuesta no JSON en lesson learned: ${parsed.error}`);
+        return;
+      }
+
+      if (!parsed.value?.lesson_learned_brief) {
+        setUiError("Respuesta inválida: no llegó lesson_learned_brief.");
+        return;
+      }
+
+      setLessonResult(parsed.value);
+      setUiInfo("✅ Lección aprendida procesada y lista para el ATS.");
+    } catch (err: any) {
+      setUiError(`Excepción cargando lección aprendida: ${String(err?.message || err)}`);
+    } finally {
+      setLessonUploading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (incidentsReference !== "Si") {
+      clearLessonLearned();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incidentsReference]);
+
+  useEffect(() => {
+
+  const selected = approvers.find((a) => a.id === selectedApproverId);
+
+  if (!selected) {
+    setApproverName("");
+    setApproverRole("");
+    setApproverEmail("");
+    setApproverPhone("");
+    return;
+  }
+
+  setApproverName(selected.name);
+  setApproverRole(selected.role);
+  setApproverEmail(selected.email);
+  setApproverPhone(selected.phone);
+}, [selectedApproverId, approvers]);
+useEffect(() => {
+  async function loadApprovers() {
+    try {
+      const res = await fetch("/api/list-approvers", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const text = await res.text();
+      const parsed = safeJsonParse<any>(text);
+
+      if (!res.ok || !parsed.ok || !parsed.value?.ok) {
+        console.error("Error cargando aprobadores:", text);
+        return;
+      }
+
+      setApprovers(Array.isArray(parsed.value.data) ? parsed.value.data : []);
+    } catch (err) {
+      console.error("Excepción cargando aprobadores:", err);
+    }
+  }
+
+  loadApprovers();
+}, []);
+
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const fileTitle = useMemo(() => {
+    const t = String(atsResult?.meta?.title || jobTitle || "Trabajo")
+      .trim()
+      .replace(/\s+/g, "_");
+    const d =
+      String(atsResult?.meta?.date || formatDateEsCOFromISO(executionDateISO) || "")
+        .trim()
+        .replace(/\//g, "-") || "";
+    return `ATS_${t}${d ? `_${d}` : ""}`;
+  }, [atsResult, jobTitle, executionDateISO]);
+
+  const handlePrintToPdf = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: fileTitle,
+    pageStyle: `
+      @page { size: A4; margin: 10mm; }
+      @media print {
+        html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .no-print { display: none !important; }
+        .print-only { display: block !important; }
+      }
+    `,
+    onPrintError: (_location, error) => {
+      setUiError(`Error al imprimir: ${String((error as any)?.message || error)}`);
+    },
+  });
+
+  async function loadATSHistory() {
+    if (!adminUnlocked) return;
+
+    try {
+      setLoadingHistory(true);
+
+      const res = await fetch("/api/list-ats", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const text = await res.text();
+      const parsed = safeJsonParse<any>(text);
+
+      if (!res.ok) {
+        console.error("Error listando ATS:", text);
+        return;
+      }
+
+      if (!parsed.ok || !parsed.value?.ok) {
+        console.error("Respuesta inválida listando ATS:", text);
+        return;
+      }
+
+      setAtsHistory(Array.isArray(parsed.value.data) ? parsed.value.data : []);
+    } catch (err) {
+      console.error("Excepción listando ATS:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
+
+  async function refreshSavedATS() {
+  if (!savedAtsId) {
+    setUiError("Primero debes guardar el ATS para poder refrescarlo.");
+    return;
+  }
+
+  try {
+    setUiError(null);
+    setUiInfo(null);
+
+    const res = await fetch(`/api/get-ats?id=${savedAtsId}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    const text = await res.text();
+    const parsed = safeJsonParse<any>(text);
+
+    if (!res.ok) {
+      setUiError(`Error consultando ATS actualizado (HTTP ${res.status}): ${text}`);
+      return;
+    }
+
+    if (!parsed.ok || !parsed.value?.ok) {
+      setUiError("No se pudo refrescar el ATS actualizado.");
+      return;
+    }
+
+    const freshAts = parsed.value?.data?.ats_json || null;
+
+    if (!freshAts) {
+      setUiError("La respuesta no trajo ats_json.");
+      return;
+    }
+
+    const remoteApproverSignature =
+  parsed.value?.approval_link?.approver_signature_data ||
+  freshAts?.estrella_format?.authorizations?.approver?.signature ||
+  "";
+
+const remoteApproverName =
+  parsed.value?.approval_link?.approver_name ||
+  freshAts?.estrella_format?.authorizations?.approver?.name ||
+  "";
+
+    setAtsResult((prev: any) => {
+      if (!prev) return freshAts;
+
+      return {
+        ...prev,
+        estrella_format: {
+          ...(prev?.estrella_format || {}),
+          authorizations: {
+            ...(prev?.estrella_format?.authorizations || {}),
+            approver: {
+              ...(prev?.estrella_format?.authorizations?.approver || {}),
+              ...(freshAts?.estrella_format?.authorizations?.approver || {}),
+            },
+          },
+        },
+      };
+    });
+const supervisorData =
+  freshAts?.estrella_format?.authorizations?.supervisor || {};
+
+setSupervisorName((prev) => supervisorData?.name || prev);
+setSupervisorRole((prev) => supervisorData?.role || prev);
+setSupervisorSignature((prev) => supervisorData?.signature || prev);
+
+    if (remoteApproverName) {
+  setApproverName(remoteApproverName || "");
+}
+
+if (remoteApproverSignature) {
+  setApproverSignature(remoteApproverSignature);
+}
+
+    setUiInfo("✅ ATS refrescado con la firma remota del aprobador.");
+  } catch (err: any) {
+    setUiError(`Excepción refrescando ATS: ${String(err?.message || err)}`);
+  }
+}
+async function handleSearchATSByCode() {
+  try {
+    setUiError(null);
+    setUiInfo(null);
+
+    if (!searchCode.trim()) {
+      setUiError("Debes ingresar un código ATS.");
+      return;
+    }
+
+    setSearchingATS(true);
+
+    const res = await fetch(
+      `/api/find-ats-by-code?code=${encodeURIComponent(searchCode.trim())}`,
+      { method: "GET", cache: "no-store" }
+    );
+
+    const text = await res.text();
+    const parsed = safeJsonParse<any>(text);
+
+    if (!res.ok || !parsed.ok || !parsed.value?.ok) {
+      setUiError(parsed.ok ? parsed.value?.error || "No se encontró el ATS." : text);
+      return;
+    }
+
+    const atsRow = parsed.value?.data;
+    const approvalLink = parsed.value?.approval_link;
+    const ats = atsRow?.ats_json;
+
+    if (!ats) {
+      setUiError("El ATS encontrado no contiene ats_json.");
+      return;
+    }
+
+    const estrella = ats?.estrella_format || {};
+    const auth = estrella?.authorizations || {};
+    const supervisor = auth?.supervisor || {};
+    const approver = auth?.approver || {};
+    const supervisorSignatureLoaded =
+    supervisor?.signature ||
+    ats?.estrella_format?.authorizations?.supervisor?.signature ||
+    "";
+
+  const approverSignatureLoaded =
+  approvalLink?.approver_signature_data ||
+  approver?.signature ||
+  ats?.estrella_format?.authorizations?.approver?.signature ||
+  "";
+    setAtsResult(ats);
+    setSupervisorName(supervisor?.name || "");
+    setSupervisorRole(supervisor?.role || "");
+    setSupervisorSignature(supervisorSignatureLoaded);
+    setSavedAtsId(atsRow.id || "");
+    setSavedAtsCode(atsRow.ats_code || "");
+
+    setJobTitle(ats?.meta?.title || "");
+    setCompany(ats?.meta?.company || "");
+    setLocation(ats?.meta?.location || "");
+    setShift(ats?.meta?.shift || "");
+
+    setAtsNumber(estrella?.atsNumber || "");
+    setPermitNumber(estrella?.permitNumber || "");
+    setFormatVersion(estrella?.version || "");
+    setProcedureCodeRelated(estrella?.procedureCodeRelated || "");
+    setWorkFront(estrella?.workFront || "");
+
+    setIncidentsReference(estrella?.incidentsReference || "");
+    setOtherCompanies(estrella?.otherCompanies || "");
+
+    setDangerTypes(Array.isArray(estrella?.dangerTypes) ? estrella.dangerTypes : []);
+    setDangerTypesOther(estrella?.dangerTypesOther || "");
+
+    setEnvironmentDangers(
+      Array.isArray(estrella?.environmentDangers) ? estrella.environmentDangers : []
+    );
+    setEnvironmentDangersOther(estrella?.environmentDangersOther || "");
+
+    setEmergencies(Array.isArray(estrella?.emergencies) ? estrella.emergencies : []);
+    setSafetyEquipment(
+      Array.isArray(estrella?.safetyEquipment) ? estrella.safetyEquipment : []
+    );
+    setSafetyEquipmentOther(estrella?.safetyEquipmentOther || "");
+
+    setLifeSavingRules(
+      Array.isArray(estrella?.lifeSavingRules) ? estrella.lifeSavingRules : []
+    );
+
+   const loadedExecutants =
+  Array.isArray(auth?.executants) && auth.executants.length > 0
+    ? auth.executants
+    : [
+        { name: "", signature: "" },
+        { name: "", signature: "" },
+        { name: "", signature: "" },
+      ];
+
+setExecutants(loadedExecutants);
+
+const requiredCount = loadedExecutants.filter(
+  (ex: any) => String(ex.name || "").trim()
+).length;
+
+const signedCount = loadedExecutants.filter(
+  (ex: any) => ex.remoteSignature || ex.signature
+).length;
+
+setExecutantRequiredCount(requiredCount);
+setExecutantSignedCount(signedCount);
+
+    setSupervisorName(supervisor?.name || "");
+    setSupervisorRole(supervisor?.role || "");
+    setSupervisorSignature(supervisor?.signature || "");
+
+    setCheckStagesClarity(supervisor?.checks?.stagesClarity || "");
+    setCheckHazardsControlled(supervisor?.checks?.hazardsControlled || "");
+    setCheckIsolationConfirmed(supervisor?.checks?.isolationConfirmed || "");
+    setCheckCommsAgreed(supervisor?.checks?.commsAgreed || "");
+    setCheckToolsOk(supervisor?.checks?.toolsOk || "");
+
+    setApproverName(approvalLink?.approver_name || approver?.name || "");
+    setApproverRole(approvalLink?.approver_role || approver?.role || "");
+    setApproverEmail(approvalLink?.approver_email || approver?.email || "");
+    setApproverPhone(approvalLink?.approver_phone || approver?.phone || "");
+    setApproverSignature(approverSignatureLoaded);
+setStartMode("new");
+    setUiInfo(`✅ ATS ${atsRow.ats_code} cargado correctamente.`);
+  } catch (err: any) {
+    setUiError(`Excepción buscando ATS: ${String(err?.message || err)}`);
+  } finally {
+    setSearchingATS(false);
+  }
+}
+  useEffect(() => {
+    if (adminUnlocked) {
+      loadATSHistory();
+    }
+  }, [adminUnlocked]);
+
+useEffect(() => {
+  if (!savedAtsId) return;
+
+  const interval = window.setInterval(() => {
+    refreshSavedATS();
+  }, 5000);
+
+  return () => window.clearInterval(interval);
+}, [savedAtsId]);
+
+useEffect(() => {
+  if (!savedAtsId) return;
+
+  refreshExecutantSignatures();
+
+  const interval = setInterval(() => {
+    refreshExecutantSignatures();
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [savedAtsId]);
+
+  function openFilePicker() {
+    fileInputRef.current?.click();
+  }
+
+  function addFiles(files: File[]) {
+    const allowed = files.filter(isPdfOrDocx);
+    if (allowed.length === 0) {
+      setUiError("Solo se aceptan archivos PDF o DOCX.");
+      return;
+    }
+
+    setSelectedFiles((prev) => {
+      const existing = new Set(prev.map(fileKey));
+      const merged = [...prev];
+      for (const f of allowed) {
+        if (!existing.has(fileKey(f))) merged.push(f);
+      }
+      return merged;
+    });
+
+    setUiError(null);
+    setUiInfo(`${allowed.length} archivo(s) agregado(s).`);
+  }
+
+  function removeFile(idx: number) {
+    setSelectedFiles((prev) => {
+      const next = [...prev];
+      next.splice(idx, 1);
+      return next;
+    });
+  }
+
+  function clearAllFiles() {
+    setSelectedFiles([]);
+    setProcedureRefs([]);
+    setProcedureResults([]);
+    setAtsResult(null);
+    setOpenSteps({});
+    setSavedAtsId(null);
+    setApproverLink("");
+    setApproverSignature("");
+    setUiInfo("Archivos limpiados.");
+    setUiError(null);
+  }
+
+  async function uploadSingleProcedure(file: File): Promise<ProcedureResult> {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/procedure-brief", {
+        method: "POST",
+        body: formData,
+      });
+
+      const text = await res.text();
+      if (!res.ok) {
+        return {
+          ok: false,
+          fileName: file.name,
+          error: "Error en /api/procedure-brief",
+          details: `HTTP ${res.status}: ${text}`,
+        };
+      }
+
+      const parsed = safeJsonParse<any>(text);
+      if (!parsed.ok) {
+        return {
+          ok: false,
+          fileName: file.name,
+          error: "Respuesta no es JSON",
+          details: parsed.error,
+        };
+      }
+
+      const proc = parsed.value?.procedure_ref;
+      if (!proc || typeof proc !== "object") {
+        return {
+          ok: false,
+          fileName: file.name,
+          error: "Respuesta inválida",
+          details: "No llegó procedure_ref",
+        };
+      }
+
+      return { ok: true, fileName: file.name, procedure: proc };
+    } catch (err: any) {
+      return {
+        ok: false,
+        fileName: file.name,
+        error: "Excepción subiendo procedimiento",
+        details: String(err?.message || err),
+      };
+    }
+  }
+
+  async function handleUploadProcedures() {
+    setUiError(null);
+    setUiInfo(null);
+
+    if (!selectedFiles.length) {
+      setUiError("Selecciona al menos 1 archivo PDF o DOCX.");
+      return;
+    }
+
+    setUploading(true);
+    setProcedureResults([]);
+    setProcedureRefs([]);
+    setAtsResult(null);
+    setOpenSteps({});
+
+    try {
+      const results: ProcedureResult[] = [];
+      const procs: ProcedureRef[] = [];
+
+      for (const file of selectedFiles) {
+        const r = await uploadSingleProcedure(file);
+        results.push(r);
+        if (r.ok && r.procedure) procs.push(r.procedure);
+
+        setProcedureResults([...results]);
+        setProcedureRefs([...procs]);
+      }
+
+      const okCount = procs.length;
+      const failCount = results.filter((r) => !r.ok).length;
+
+      if (okCount === 0) {
+        setUiError("Se procesaron archivos, pero no se extrajo ningún documento técnico válido.");
+      } else {
+        setUiInfo(`Documentos técnicos listos: ${okCount}. Fallidos: ${failCount}.`);
+      }
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const missingReasons = useMemo(() => {
+    const reasons: string[] = [];
+
+    if (!jobTitle.trim()) reasons.push("Falta Actividad/Trabajo.");
+    if (!company.trim()) reasons.push("Falta Empresa.");
+    if (!location.trim()) reasons.push("Falta Ubicación.");
+    if (!dateISO) reasons.push("Falta Fecha (meta).");
+    if (!shift.trim()) reasons.push("Falta Turno/Jornada.");
+
+    if (selectedFiles.length === 0) reasons.push("No has seleccionado documentos técnicos.");
+    if (procedureRefs.length === 0) reasons.push("No has procesado documentos técnicos (procedimientos/FDS).");
+
+if (!executionDateISO)
+  reasons.push(`Falta Fecha de ejecución (Formato ${companyConfig.shortName}).`);
+
+if (!elaborationDateISO)
+  reasons.push(`Falta Fecha de elaboración (Formato ${companyConfig.shortName}).`);
+
+    if (incidentsReference === "Si") {
+      if (!lessonResult?.lesson_learned_brief) {
+        reasons.push("Incidentes = Sí → Debes cargar y procesar una Lección aprendida (PDF/DOCX).");
+      }
+      if (lessonUploading) reasons.push("Espera: lección aprendida en procesamiento.");
+    }
+
+    if (uploading) reasons.push("Espera: documentos técnicos en procesamiento.");
+    if (generatingATS) reasons.push("Espera: ATS generándose.");
+    if (savingATS) reasons.push("Espera: ATS guardándose.");
+
+    return reasons;
+  }, [
+    jobTitle,
+    company,
+    location,
+    dateISO,
+    shift,
+    selectedFiles.length,
+    procedureRefs.length,
+    uploading,
+    generatingATS,
+    savingATS,
+    executionDateISO,
+    elaborationDateISO,
+    incidentsReference,
+    lessonResult,
+    lessonUploading,
+  ]);
+
+  const canGenerateATS = useMemo(() => missingReasons.length === 0, [missingReasons]);
+
+  async function handleGenerateATS() {
+    setUiError(null);
+    setUiInfo(null);
+
+    if (!canGenerateATS) {
+      setUiError("No se puede generar ATS aún. Revisa los faltantes.");
+      return;
+    }
+
+    setGeneratingATS(true);
+    setAtsResult(null);
+    setOpenSteps({});
+
+    try {
+      const envSanitized = sanitizeEnvironment(environment);
+
+      const payload: any = {
+        jobTitle: jobTitle.trim(),
+        activity_description: activityDescription.trim(),
+        norm_reference: normReference.trim(),
+        company: company.trim(),
+        location: location.trim(),
+        date: formatDateEsCOFromISO(dateISO),
+        shift: shift.trim(),
+        environment: envSanitized,
+        procedure_refs: procedureRefs,
+        estrella_format: {
+          atsNumber: atsNumber.trim(),
+          permitNumber: permitNumber.trim(),
+          elaborationDate: formatDateEsCOFromISO(elaborationDateISO),
+          executionDate: formatDateEsCOFromISO(executionDateISO),
+          version: formatVersion.trim(),
+          procedureCodeRelated: procedureCodeRelated.trim(),
+          workFront: workFront.trim(),
+          incidentsReference,
+          otherCompanies,
+          dangerTypes,
+          dangerTypesOther: dangerTypesOther.trim(),
+          environmentDangers,
+          environmentDangersOther: environmentDangersOther.trim(),
+          emergencies,
+          safetyEquipment,
+          safetyEquipmentOther: safetyEquipmentOther.trim(),
+          lifeSavingRules,
+          authorizations: {
+            executants,
+            supervisor: {
+              name: supervisorName.trim(),
+              role: supervisorRole.trim(),
+              signature: supervisorSignature,
+              checks: {
+                stagesClarity: checkStagesClarity,
+                hazardsControlled: checkHazardsControlled,
+                isolationConfirmed: checkIsolationConfirmed,
+                commsAgreed: checkCommsAgreed,
+                toolsOk: checkToolsOk,
+              },
+            },
+            approver: {
+              name: approverName.trim(),
+              role: approverRole.trim(),
+              email: approverEmail.trim(),
+              phone: approverPhone.trim(),
+              signature: approverSignature,
+            },
+          },
+        },
+      };
+
+      if (incidentsReference === "Si" && lessonResult?.lesson_learned_brief) {
+        payload.lesson_learned_brief = lessonResult.lesson_learned_brief;
+      }
+
+      console.log("ATS PAYLOAD:");
+      console.log(payload);
+
+      const res = await fetch("/api/generate-ats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        setUiError(`Error generando ATS (HTTP ${res.status}): ${text}`);
+        return;
+      }
+
+      const parsed = safeJsonParse<any>(text);
+      if (!parsed.ok) {
+        setUiError(`Respuesta no JSON: ${parsed.error}`);
+        return;
+      }
+
+      const ats = parsed.value?.ats ?? parsed.value;
+      setAtsResult(ats);
+      setSavedAtsId(null);
+      setApproverLink("");
+      setApproverSignature("");
+      setUiInfo("✅ ATS generado correctamente.");
+    } catch (err: any) {
+      setUiError(`Excepción generando ATS: ${String(err?.message || err)}`);
+    } finally {
+      setGeneratingATS(false);
+    }
+  }
+
+  async function handleSaveATS() {
+    console.log("ENTRÓ A handleSaveATS");
+
+    try {
+      if (!atsResult) {
+        setUiError("No hay ATS generado para guardar.");
+        return;
+      }
+
+      setSavingATS(true);
+      setUiError(null);
+      setUiInfo(null);
+
+      const atsToSave = {
+        ...atsResult,
+        estrella_format: {
+          ...(atsResult?.estrella_format || {}),
+          atsNumber: atsNumber.trim(),
+          permitNumber: permitNumber.trim(),
+          elaborationDate: formatDateEsCOFromISO(elaborationDateISO),
+          executionDate: formatDateEsCOFromISO(executionDateISO),
+          version: formatVersion.trim(),
+          procedureCodeRelated: procedureCodeRelated.trim(),
+          workFront: workFront.trim(),
+          incidentsReference,
+          otherCompanies,
+          dangerTypes,
+          dangerTypesOther: dangerTypesOther.trim(),
+          environmentDangers,
+          environmentDangersOther: environmentDangersOther.trim(),
+          emergencies,
+          safetyEquipment,
+          safetyEquipmentOther: safetyEquipmentOther.trim(),
+          lifeSavingRules,
+          authorizations: {
+            ...(atsResult?.estrella_format?.authorizations || {}),
+            executants,
+            supervisor: {
+              ...(atsResult?.estrella_format?.authorizations?.supervisor || {}),
+              name: supervisorName.trim(),
+              role: supervisorRole.trim(),
+              signature:
+              supervisorSignature ||
+              atsResult?.estrella_format?.authorizations?.supervisor?.signature ||
+               "",
+              checks: {
+                stagesClarity: checkStagesClarity,
+                hazardsControlled: checkHazardsControlled,
+                isolationConfirmed: checkIsolationConfirmed,
+                commsAgreed: checkCommsAgreed,
+                toolsOk: checkToolsOk,
+              },
+            },
+            approver: {
+              ...(atsResult?.estrella_format?.authorizations?.approver || {}),
+              name: approverName.trim(),
+              role: approverRole.trim(),
+              email: approverEmail.trim(),
+              phone: approverPhone.trim(),
+              signature: approverSignature,
+            },
+          },
+        },
+      };
+
+      const payload = {
+        ats: atsToSave,
+        activity_description: activityDescription.trim(),
+        norm_reference: normReference.trim(),
+      };
+
+      const res = await fetch("/api/save-ats", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        setUiError(`Error guardando ATS (HTTP ${res.status}): ${text}`);
+        return;
+      }
+
+      const parsed = safeJsonParse<any>(text);
+      if (!parsed.ok) {
+        setUiError(`Respuesta no JSON al guardar ATS: ${parsed.error}`);
+        return;
+      }
+
+      if (!parsed.value?.ok) {
+        setUiError("No se pudo guardar el ATS.");
+        return;
+      }
+
+      const savedRow = parsed.value?.data?.[0] || null;
+
+const newId =
+  savedRow?.id ||
+  parsed.value?.id ||
+  parsed.value?.ats_id ||
+  null;
+
+const newCode =
+  savedRow?.ats_code ||
+  "";
+
+      setAtsResult(atsToSave);
+      setSavedAtsId(newId);
+      setSavedAtsCode(newCode);
+      setApproverLink("");
+      setApproverSignature((prev) => prev);
+
+      setUiInfo("✅ ATS guardado correctamente en Supabase.");
+      await loadATSHistory();
+    } catch (err: any) {
+      setUiError(`Excepción guardando ATS: ${String(err?.message || err)}`);
+    } finally {
+      setSavingATS(false);
+    }
+  }
+
+  const decision: string | undefined = atsResult?.stop_work?.decision;
+  const decisionBadge = badgeForDecision(decision);
+  const decisionSectionCls = sectionColorForDecision(decision);
+
+  const appliedProcedures: ATSProcedureMini[] =
+    atsResult?.procedure_influence?.applied ?? atsResult?.procedure_refs_used ?? [];
+
+  const notParseableProcedures: ATSProcedureMini[] =
+    atsResult?.procedure_influence?.not_parseable ?? [];
+
+  const hazardsList = uniqueNonEmpty(atsResult?.hazards);
+  const ctrlEng = uniqueNonEmpty(atsResult?.controls?.engineering);
+  const ctrlAdm = uniqueNonEmpty(atsResult?.controls?.administrative);
+  const ctrlPpe = uniqueNonEmpty(atsResult?.controls?.ppe);
+  const stepsList: ATS["steps"] = Array.isArray(atsResult?.steps) ? atsResult.steps : [];
+
+  const execDatePrint = formatDateEsCOFromISO(executionDateISO);
+  const elabDatePrint = formatDateEsCOFromISO(elaborationDateISO);
+
+  const checklist: ATSChecklistActions | null =
+    (atsResult?.checklist_actions as ATSChecklistActions) ?? null;
+
+  const box = (checked: boolean) => (checked ? "X" : " ");
+  const boxByVal = (val: string, target: "SI" | "NO" | "N.A.") => box(val === target);
+
+  const topHazards = hazardsList.slice(0, 8);
+  const topControls = uniqueNonEmpty([...ctrlEng, ...ctrlAdm, ...ctrlPpe]).slice(0, 10);
+  const topSteps = stepsList.slice(0, 6);
+
+  const supervisionChecklistRows = [
+    "ATS socializado con todo el equipo (charla preturno realizada).",
+    "Roles y responsabilidades definidos (líder, señalero, vigía, etc.).",
+    "Área demarcada y control de accesos implementado.",
+    "Permisos requeridos verificados y vigentes (si aplica).",
+    "Aislamiento de energías (LOTO/EMN) verificado si aplica.",
+    "EPP correcto disponible y en buen estado.",
+    "Herramientas/equipos inspeccionados y aptos para uso.",
+    "Plan de emergencias y comunicación verificados (rutas, puntos, radios/teléfono).",
+  ];
+const localSignedExecutants = executants.filter(
+  (ex: any) => ex.remoteSignature || ex.signature
+).length;
+
+const localRequiredExecutants = executants.filter(
+  (ex: any) => String(ex.name || "").trim()
+).length;
+
+const signedCountToShow =
+  executantSignedCount > 0
+    ? executantSignedCount
+    : localSignedExecutants;
+
+const requiredCountToShow =
+  executantRequiredCount > 0
+    ? executantRequiredCount
+    : localRequiredExecutants;
+
+const allExecutantsSigned =
+  requiredCountToShow > 0 &&
+  signedCountToShow >= requiredCountToShow;
+const supervisorSignatureToShow =
+  supervisorSignature ||
+  atsResult?.estrella_format?.authorizations?.supervisor?.signature ||
+  "";
+
+const approverSignatureToShow =
+  approverSignature ||
+  atsResult?.estrella_format?.authorizations?.approver?.signature ||
+  "";
+
+  return (
+  <main className="min-h-screen bg-white text-neutral-900">
+    <div className="max-w-5xl mx-auto p-6 space-y-6 bg-white">
+<a
+  href="/control-trabajo"
+  className="no-print inline-flex items-center text-sm text-neutral-600 hover:text-neutral-950"
+>
+  ← Volver a Control de Trabajo
+</a>
+      <div className="no-print flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold">ATS Inteligente</h1>
+          <div className="text-sm text-neutral-600">Análisis de Trabajo Seguro</div>
+        </div>
+
+        <img
+          src={companyLogoSrc}
+          alt="Logo compañía"
+          className="h-20 w-auto object-contain"
+        />
+      </div>
+<section className="no-print border rounded p-4 space-y-3 bg-neutral-50">
+  <div className="font-semibold">¿Qué deseas hacer?</div>
+
+  <div className="flex flex-wrap gap-2">
+    <button
+  type="button"
+  onClick={() => {
+  setStartMode("new");
+
+  setAtsResult(null);
+
+  setSavedAtsId(null);
+  setSavedAtsCode("");
+
+  setApproverLink("");
+  setApproverSignature("");
+
+  setUiError(null);
+  setUiInfo(null);
+
+  setJobTitle("");
+  setCompany("");
+  setLocation("");
+  setShift("");
+
+  setActivityDescription("");
+  setNormReference("");
+
+  setOpenSteps({});
+
+  setExecutants([{ name: "", signature: "" }]);
+
+  setSupervisorName("");
+  setSupervisorRole("");
+  setSupervisorSignature("");
+
+  setApproverName("");
+  setApproverEmail("");
+  setApproverPhone("");
+
+  setSelectedApproverId("");
+
+  setDangerTypes([]);
+  setEnvironmentDangers([]);
+  setEmergencies([]);
+  setSafetyEquipment([]);
+  setLifeSavingRules([]);
+
+  setProcedureRefs([]);
+  setProcedureResults([]);
+
+  setSelectedFiles([]);
+
+  setSearchCode("");
+
+  setCheckStagesClarity("N.A.");
+  setCheckHazardsControlled("N.A.");
+  setCheckIsolationConfirmed("N.A.");
+  setCheckCommsAgreed("N.A.");
+  setCheckToolsOk("N.A.");
+setAtsNumber("");
+setPermitNumber("");
+setFormatVersion("");
+setWorkFront("");
+setProcedureCodeRelated("");
+
+setIncidentsReference("No");
+setOtherCompanies("No");
+
+setDangerTypesOther("");
+setEnvironmentDangersOther("");
+setSafetyEquipmentOther("");
+
+setLessonFile(null);
+setLessonResult(null);
+
+  setEnvironment({
+    timeOfDay: null,
+    weather: null,
+    wind: null,
+    visibility: null,
+    terrain: null,
+    temperatureC: null,
+    humidityPct: null,
+  });
+  }}
+  className="px-4 py-2 bg-green-700 text-white rounded"
+    >
+      Crear nuevo ATS
+    </button>
+
+    <button
+      type="button"
+      onClick={() => setStartMode("load")}
+      className="px-4 py-2 bg-black text-white rounded"
+    >
+      Cargar ATS existente
+    </button>
+  </div>
+</section>
+
+{startMode === "load" && (
+  <section className="no-print border rounded p-4 space-y-3 bg-blue-50 border-blue-200">
+    <div className="font-semibold">Buscar ATS por código</div>
+
+    <div className="text-sm text-neutral-700">
+      Consulta ATS previamente guardados usando su código único.
+    </div>
+
+    <div className="flex flex-col md:flex-row gap-2">
+      <input
+        type="text"
+        value={searchCode}
+        onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
+        placeholder="Ej: ATS-2026-123456"
+        className="border p-2 rounded md:w-[320px]"
+      />
+
+      <button
+        type="button"
+        onClick={handleSearchATSByCode}
+        disabled={searchingATS}
+        className="px-4 py-2 bg-black text-white rounded disabled:opacity-50"
+      >
+        {searchingATS ? "Buscando..." : "Buscar ATS"}
+      </button>
+    </div>
+  </section>
+)}
+      {(uiError || uiInfo) && (
+        <div
+          className={[
+            "border rounded p-3 text-sm",
+            uiError
+              ? "bg-red-50 border-red-200 text-red-800"
+              : "bg-green-50 border-green-200 text-green-800",
+          ].join(" ")}
+        >
+          {uiError ?? uiInfo}
+        </div>
+      )}
+{startMode === "new" && (
+  <div className="space-y-0">
+    <section className="no-print border rounded p-4 space-y-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <div className="text-xs text-neutral-600">Gestión de HSSEQ</div>
+            <div className="text-lg font-semibold">Análisis de Trabajo Seguro</div>
+            <div className="text-xs text-neutral-600">
+              Formato: <b>02-01-102-F001</b> · Revisión: <b>07</b> · Emisión: <b>04/09/2024</b>
+            </div>
+          </div>
+          <div className="text-xs text-neutral-600">
+            Página: <b>1 de 1</b>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <input
+            placeholder="N° ATS"
+            value={atsNumber}
+            onChange={(e) => setAtsNumber(e.target.value)}
+            className="border p-2 rounded"
+          />
+          <input
+            placeholder="N° Permiso de trabajo"
+            value={permitNumber}
+            onChange={(e) => setPermitNumber(e.target.value)}
+            className="border p-2 rounded"
+          />
+          <input
+            placeholder="Versión"
+            value={formatVersion}
+            onChange={(e) => setFormatVersion(e.target.value)}
+            className="border p-2 rounded"
+          />
+          <div className="grid grid-cols-1 gap-2">
+            <label className="text-xs text-neutral-600">Fecha de elaboración</label>
+            <input
+              type="date"
+              value={elaborationDateISO}
+              onChange={(e) => setElaborationDateISO(e.target.value)}
+              className="border p-2 rounded"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2">
+            <label className="text-xs text-neutral-600">Fecha de ejecución</label>
+            <input
+              type="date"
+              value={executionDateISO}
+              onChange={(e) => setExecutionDateISO(e.target.value)}
+              className="border p-2 rounded"
+            />
+          </div>
+          <input
+            placeholder="Frente de trabajo"
+            value={workFront}
+            onChange={(e) => setWorkFront(e.target.value)}
+            className="border p-2 rounded"
+          />
+          <input
+            placeholder="Código del procedimiento relacionado"
+            value={procedureCodeRelated}
+            onChange={(e) => setProcedureCodeRelated(e.target.value)}
+            className="border p-2 rounded md:col-span-2"
+          />
+        </div>
+<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="border rounded p-3">
+            <div className="font-medium">Incidentes en trabajos similares</div>
+            <div className="mt-2 flex gap-4">
+              {(["Si", "No"] as const).map((v) => (
+                <label key={v} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="incidentsReference"
+                    checked={incidentsReference === v}
+                    onChange={() => setIncidentsReference(v)}
+                  />
+                  {v}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="border rounded p-3">
+            <div className="font-medium">Involucra personal de otras compañías</div>
+            <div className="mt-2 flex gap-4">
+              {(["Si", "No"] as const).map((v) => (
+                <label key={v} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="otherCompanies"
+                    checked={otherCompanies === v}
+                    onChange={() => setOtherCompanies(v)}
+                  />
+                  {v}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {incidentsReference === "Si" && (
+          <div className="border rounded p-3 bg-amber-50 border-amber-200">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold">Lección aprendida (obligatoria)</div>
+                <div className="text-xs text-neutral-700 mt-1">
+                  Marcaste <b>Incidentes = Sí</b>. Debes cargar y procesar una lección aprendida
+                  antes de generar el ATS.
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={openLessonPicker}
+                  className="bg-black text-white px-4 py-2 rounded"
+                  disabled={lessonUploading}
+                >
+                  {lessonFile ? "Cambiar archivo" : "Seleccionar archivo"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!lessonFile) {
+                      setUiError("Primero selecciona un archivo de lección aprendida.");
+                      return;
+                    }
+                    uploadLessonLearned(lessonFile);
+                  }}
+                  className="px-4 py-2 border rounded disabled:opacity-50"
+                  disabled={lessonUploading || !lessonFile}
+                >
+                  {lessonUploading ? "Procesando..." : "Procesar lección"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={clearLessonLearned}
+                  className="px-4 py-2 border rounded disabled:opacity-50"
+                  disabled={lessonUploading}
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
+
+            <input
+              ref={lessonInputRef}
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              hidden
+              onChange={(e) => {
+                const f = Array.from(e.target.files || [])[0] || null;
+                setLessonFile(f);
+                setLessonResult(null);
+                setUiError(null);
+                setUiInfo(f ? `Lección aprendida seleccionada: ${f.name}` : null);
+                e.currentTarget.value = "";
+              }}
+            />
+
+            <div className="mt-2 text-sm">
+              {lessonFile ? (
+                <div>
+                  Archivo: <b>{lessonFile.name}</b>{" "}
+                  <span className="text-neutral-500">({Math.round(lessonFile.size / 1024)} KB)</span>
+                </div>
+              ) : (
+                <div className="text-neutral-700">No has seleccionado archivo.</div>
+              )}
+            </div>
+
+            <div className="mt-1 text-sm">
+              Estado:{" "}
+              {lessonResult?.lesson_learned_brief ? (
+                <span className="text-green-700 font-semibold">✅ Lista</span>
+              ) : lessonUploading ? (
+                <span className="text-neutral-700">Procesando...</span>
+              ) : (
+                <span className="text-red-700 font-semibold">❌ Pendiente</span>
+              )}
+            </div>
+
+            {lessonResult?.lesson?.summary && (
+              <div className="mt-2 text-xs text-neutral-700">
+                <b>Resumen:</b> {String(lessonResult.lesson.summary).slice(0, 220)}
+                {String(lessonResult.lesson.summary).length > 220 ? "..." : ""}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="border rounded p-3">
+            <div className="font-medium">Tipos de peligros</div>
+            <div className="mt-2 space-y-1 text-sm">
+              {PELIGROS_TIPOS.map((p) => (
+                <label key={p} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={dangerTypes.includes(p)}
+                    onChange={() => setDangerTypes((prev) => toggleInArray(prev, p))}
+                  />
+                  {p}
+                </label>
+              ))}
+              {dangerTypes.includes("Otros") && (
+                <input
+                  placeholder="Otros (Tipos de peligros)"
+                  value={dangerTypesOther}
+                  onChange={(e) => setDangerTypesOther(e.target.value)}
+                  className="border p-2 rounded w-full mt-2"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="border rounded p-3">
+            <div className="font-medium">Peligros del entorno (Periféricos)</div>
+            <div className="mt-2 space-y-1 text-sm">
+              {PELIGROS_ENTORNO.map((p) => (
+                <label key={p} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={environmentDangers.includes(p)}
+                    onChange={() => setEnvironmentDangers((prev) => toggleInArray(prev, p))}
+                  />
+                  {p}
+                </label>
+              ))}
+              {environmentDangers.includes("Otros") && (
+                <input
+                  placeholder="Otros (Entorno)"
+                  value={environmentDangersOther}
+                  onChange={(e) => setEnvironmentDangersOther(e.target.value)}
+                  className="border p-2 rounded w-full mt-2"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="border rounded p-3">
+            <div className="font-medium">Situaciones de emergencia potenciales</div>
+            <div className="mt-2 space-y-1 text-sm">
+              {EMERGENCIAS.map((p) => (
+                <label key={p} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={emergencies.includes(p)}
+                    onChange={() => setEmergencies((prev) => toggleInArray(prev, p))}
+                  />
+                  {p}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="border rounded p-3">
+          <div className="font-medium">Equipamiento de seguridad</div>
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+            {EQUIPO_SEGURIDAD.map((p) => (
+              <label key={p} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={safetyEquipment.includes(p)}
+                  onChange={() => setSafetyEquipment((prev) => toggleInArray(prev, p))}
+                />
+                {p}
+              </label>
+            ))}
+          </div>
+          {safetyEquipment.includes("Otros") && (
+            <input
+              placeholder="Otros (Equipamiento)"
+              value={safetyEquipmentOther}
+              onChange={(e) => setSafetyEquipmentOther(e.target.value)}
+              className="border p-2 rounded w-full mt-3"
+            />
+          )}
+        </div>
+
+        <div className="border rounded p-3">
+          <div className="font-medium">Marcar Acuerdos de Vida aplicables</div>
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            {ACUERDOS_DE_VIDA.map((p) => (
+              <label key={p} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={lifeSavingRules.includes(p)}
+                  onChange={() => setLifeSavingRules((prev) => toggleInArray(prev, p))}
+                />
+                {p}
+              </label>
+            ))}
+          </div>
+          <div className="mt-3 text-xs font-semibold text-red-700">
+            Deténgase y busque ayuda si alguno de los controles/acciones anteriores no se ha
+            implementado
+          </div>
+        </div>
+      </section>
+
+      <section className="no-print grid grid-cols-1 md:grid-cols-3 gap-4">
+        <input
+          placeholder="Actividad / Trabajo"
+          value={jobTitle}
+          onChange={(e) => setJobTitle(e.target.value)}
+          className="border p-2 rounded"
+        />
+        <input
+          placeholder="Empresa"
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+          className="border p-2 rounded"
+        />
+        <input
+          placeholder="Ubicación"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          className="border p-2 rounded"
+        />
+        <input
+          type="date"
+          value={dateISO}
+          onChange={(e) => setDateISO(e.target.value)}
+          className="border p-2 rounded"
+        />
+        <input
+          placeholder="Turno / Jornada"
+          value={shift}
+          onChange={(e) => setShift(e.target.value)}
+          className="border p-2 rounded md:col-span-2"
+        />
+      </section>
+
+      <section className="no-print border rounded p-4 space-y-3">
+        <div className="font-semibold">Descripción breve de la actividad</div>
+
+        <textarea
+          value={activityDescription}
+          onChange={(e) => setActivityDescription(e.target.value)}
+          placeholder="Describe brevemente el trabajo a realizar, equipo principal y contexto operativo."
+          className="border p-2 rounded w-full min-h-[110px]"
+        />
+
+        <div className="text-sm text-neutral-600">
+          Esta descripción ayuda a la IA a identificar mejor peligros, controles y pasos del ATS.
+        </div>
+      </section>
+
+      <section className="no-print border rounded p-4 space-y-3">
+        <div className="font-semibold">Referencia normativa (opcional)</div>
+
+        <input
+          type="text"
+          value={normReference}
+          onChange={(e) => setNormReference(e.target.value)}
+          placeholder="Ej: Resolución 4272 de 2021 / Resolución 0491 de 2020 / API RP 754"
+          className="border p-2 rounded w-full"
+        />
+
+        <div className="text-sm text-neutral-600">
+          Si indicas una norma o referencia, la IA la usará para reforzar recomendaciones,
+          controles y criterios de detención del ATS.
+        </div>
+      </section>
+
+      <section className="no-print border rounded p-4 space-y-3">
+        <h2 className="font-semibold">Condiciones del entorno</h2>
+
+        <select
+          value={environment.timeOfDay ?? ""}
+          onChange={(e) => setEnvironment((v) => ({ ...v, timeOfDay: e.target.value || null }))}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">Hora del día</option>
+          <option value="Día">Día</option>
+          <option value="Noche">Noche</option>
+        </select>
+
+        <select
+          value={environment.weather ?? ""}
+          onChange={(e) => setEnvironment((v) => ({ ...v, weather: e.target.value || null }))}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">Clima</option>
+          <option value="Despejado">Despejado</option>
+          <option value="Lluvia">Lluvia</option>
+          <option value="Tormenta eléctrica">Tormenta eléctrica</option>
+          <option value="Neblina">Neblina</option>
+        </select>
+
+        <select
+          value={environment.wind ?? ""}
+          onChange={(e) => setEnvironment((v) => ({ ...v, wind: e.target.value || null }))}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">Viento</option>
+          <option value="Calmo">Calmo</option>
+          <option value="Moderado">Moderado</option>
+          <option value="Fuerte">Fuerte</option>
+        </select>
+
+        <select
+          value={environment.visibility ?? ""}
+          onChange={(e) => setEnvironment((v) => ({ ...v, visibility: e.target.value || null }))}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">Visibilidad</option>
+          <option value="Alta">Alta</option>
+          <option value="Media">Media</option>
+          <option value="Baja">Baja</option>
+        </select>
+
+        <select
+          value={environment.terrain ?? ""}
+          onChange={(e) => setEnvironment((v) => ({ ...v, terrain: e.target.value || null }))}
+          className="border p-2 rounded w-full"
+        >
+          <option value="">Terreno</option>
+          <option value="Seco">Seco</option>
+          <option value="Húmedo/Resbaloso">Húmedo/Resbaloso</option>
+          <option value="Barro">Barro</option>
+        </select>
+
+        <input
+          type="number"
+          placeholder="Temperatura °C"
+          value={environment.temperatureC ?? ""}
+          onChange={(e) =>
+            setEnvironment((v) => ({
+              ...v,
+              temperatureC: e.target.value === "" ? null : Number(e.target.value),
+            }))
+          }
+          className="border p-2 rounded w-full"
+        />
+
+        <input
+          type="number"
+          placeholder="Humedad %"
+          value={environment.humidityPct ?? ""}
+          onChange={(e) =>
+            setEnvironment((v) => ({
+              ...v,
+              humidityPct: e.target.value === "" ? null : Number(e.target.value),
+            }))
+          }
+          className="border p-2 rounded w-full"
+        />
+      </section>
+
+      <section className="no-print border rounded p-4 space-y-3">
+        <div className="font-semibold">Documentos técnicos de soporte</div>
+        <div className="text-sm text-neutral-600">
+          Carga aquí procedimientos operativos y FDS/Fichas de Datos de Seguridad si aplican.
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={openFilePicker} className="bg-black text-white px-4 py-2 rounded">
+            Seleccionar procedimientos / FDS
+          </button>
+
+          <button
+          type="button"
+          onClick={handleUploadProcedures}
+            disabled={uploading || selectedFiles.length === 0}
+            className="px-4 py-2 border rounded disabled:opacity-50"
+          >
+            {uploading ? "Procesando..." : "Procesar documentos técnicos"}
+          </button>
+
+          <button type="button" onClick={clearAllFiles} className="px-4 py-2 border rounded">
+            Limpiar
+          </button>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          hidden
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            addFiles(files);
+            e.currentTarget.value = "";
+          }}
+        />
+
+        <div className="text-sm">
+          {selectedFiles.length > 0 ? (
+            <div className="text-green-700">✅ {selectedFiles.length} documento(s) seleccionado(s)</div>
+          ) : (
+            <div className="text-neutral-600">No hay documentos seleccionados.</div>
+          )}
+        </div>
+
+        {selectedFiles.length > 0 && (
+          <ul className="divide-y border rounded">
+            {selectedFiles.map((f, idx) => (
+              <li
+                key={`${f.name}-${f.size}-${idx}`}
+                className="flex items-center justify-between p-2 text-sm"
+              >
+                <span>
+                  {f.name} <span className="text-neutral-500">({Math.round(f.size / 1024)} KB)</span>
+                </span>
+                <button type="button" className="text-red-700 underline" onClick={() => removeFile(idx)}>
+                  Quitar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="text-sm">
+          Documentos técnicos procesados: <b>{procedureRefs.length}</b>
+        </div>
+
+        {procedureResults.length > 0 && (
+          <div className="mt-2">
+            <div className="text-sm font-medium mb-1">Detalle por archivo</div>
+            <ul className="divide-y border rounded">
+              {procedureResults.map((r, i) => (
+                <li key={i} className="p-2 text-sm">
+                  <div>
+                    <b>{r.fileName}</b>{" "}
+                    {r.ok ? (
+                      <span className="text-green-700">✅ OK</span>
+                    ) : (
+                      <span className="text-red-700">❌ Error</span>
+                    )}
+                  </div>
+                  {!r.ok && (
+                    <div className="text-red-800 mt-1">
+                      {r.error || "Error"} {r.details ? `— ${r.details}` : ""}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      {missingReasons.length > 0 && (
+        <section className="no-print border rounded p-4 bg-yellow-50">
+          <div className="font-semibold mb-2">Faltantes antes de generar ATS:</div>
+          <ul className="list-disc pl-5 text-sm">
+            {missingReasons.map((m, idx) => (
+              <li key={idx}>{m}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="no-print border rounded p-4 flex items-center gap-3">
+        <button
+          onClick={handleGenerateATS}
+          disabled={!canGenerateATS}
+          className="bg-green-700 text-white px-5 py-2 rounded disabled:opacity-50"
+        >
+          {generatingATS ? "Generando..." : "Generar ATS"}
+        </button>
+        <span className="text-sm text-neutral-600">
+          {canGenerateATS ? "Listo para generar." : "Completa los faltantes."}
+        </span>
+      </section>
+
+      {atsResult?.stop_work && (
+        <section className={`border rounded p-4 space-y-4 ${decisionSectionCls}`}>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div className="text-sm text-neutral-700">Decisión Stop Work</div>
+              <div className="text-xl font-semibold">{atsResult.stop_work.decision}</div>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${decisionBadge.cls}`}>
+              {decisionBadge.label}
+            </span>
+          </div>
+
+          <div className="text-sm">
+            <div className="font-medium">Razonamiento</div>
+            <div className="mt-1 text-neutral-800">{atsResult.stop_work.rationale || "—"}</div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border rounded bg-white p-3">
+              <div className="font-medium">Documentos técnicos aplicados</div>
+              {appliedProcedures.length === 0 ? (
+                <div className="text-sm text-neutral-600 mt-2">No se registraron documentos aplicados.</div>
+              ) : (
+                <ul className="mt-2 list-disc pl-5 text-sm">
+                  {appliedProcedures.map((p, i) => (
+                    <li key={i}>{miniLabel(p)}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="border rounded bg-white p-3">
+              <div className="font-medium">Documentos no parseables</div>
+              {notParseableProcedures.length === 0 ? (
+                <div className="text-sm text-neutral-600 mt-2">Ninguno.</div>
+              ) : (
+                <>
+                  <div className="text-sm text-neutral-700 mt-2">
+                    Se dejan en constancia para revisión manual. <b>No bloquean</b> la generación del ATS.
+                  </div>
+                  <ul className="mt-2 list-disc pl-5 text-sm">
+                    {notParseableProcedures.map((p, i) => (
+                      <li key={i}>{miniLabel(p)}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+     {checklist && (
+  <ChecklistSection
+    checklist={checklist}
+    companyName={companyConfig.shortName}
+  />
+)}
+
+      {atsResult && (
+        <section className="border rounded p-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm text-neutral-600">Resumen ATS</div>
+              <div className="text-lg font-semibold">{atsResult?.meta?.title || "ATS"}</div>
+              <div className="text-sm text-neutral-700">
+                {(atsResult?.meta?.company ? `${atsResult.meta.company} — ` : "") +
+                  (atsResult?.meta?.location || "") +
+                  (atsResult?.meta?.date ? ` — ${atsResult.meta.date}` : "") +
+                  (atsResult?.meta?.shift ? ` — ${atsResult.meta.shift}` : "")}
+              </div>
+            </div>
+
+            <div className="text-sm text-neutral-700">
+              <span className="mr-3">
+                Peligros: <b>{hazardsList.length}</b>
+              </span>
+              <span className="mr-3">
+                Controles: <b>{ctrlEng.length + ctrlAdm.length + ctrlPpe.length}</b>
+              </span>
+              <span>
+                Pasos: <b>{stepsList.length}</b>
+              </span>
+            </div>
+          </div>
+
+          <div className="border rounded p-3 bg-white">
+            <div className="font-medium">Peligros identificados</div>
+            {hazardsList.length === 0 ? (
+              <div className="text-sm text-neutral-600 mt-2">—</div>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {hazardsList.map((h, i) => (
+                  <span key={i} className="text-xs border rounded-full px-3 py-1 bg-gray-50">
+                    {h}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border rounded p-3 bg-white">
+            <div className="font-medium">Pasos del trabajo</div>
+
+            {stepsList.length === 0 ? (
+              <div className="text-sm text-neutral-600 mt-2">No se generaron pasos.</div>
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {stepsList.map((s, i) => {
+                  const stepTitle = (s?.step || "").trim() || `Paso ${i + 1}`;
+                  const hz = uniqueNonEmpty(s?.hazards);
+                  const ct = uniqueNonEmpty(s?.controls);
+                  const isOpen = !!openSteps[i];
+
+                  return (
+                    <li key={i} className="border rounded">
+                      <button
+                        type="button"
+                        onClick={() => toggleStep(i)}
+                        className="w-full text-left p-3 flex items-start justify-between gap-3"
+                      >
+                        <div>
+                          <div className="font-semibold">{`${i + 1}. ${stepTitle}`}</div>
+                          <div className="text-xs text-neutral-600 mt-1">
+                            Peligros: <b>{hz.length}</b> · Controles: <b>{ct.length}</b>
+                          </div>
+                        </div>
+                        <span className="text-sm text-neutral-700">{isOpen ? "▲" : "▼"}</span>
+                      </button>
+
+                      {isOpen && (
+                        <div className="p-3 pt-0 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="border rounded p-3 bg-gray-50">
+                            <div className="font-medium text-sm">Peligros</div>
+                            {hz.length === 0 ? (
+                              <div className="text-sm text-neutral-600 mt-2">—</div>
+                            ) : (
+                              <ul className="mt-2 list-disc pl-5 text-sm space-y-1">
+                                {hz.map((x, idx) => (
+                                  <li key={idx}>{x}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          <div className="border rounded p-3 bg-gray-50">
+                            <div className="font-medium text-sm">Controles</div>
+                            {ct.length === 0 ? (
+                              <div className="text-sm text-neutral-600 mt-2">—</div>
+                            ) : (
+                              <ul className="mt-2 list-disc pl-5 text-sm space-y-1">
+                                {ct.map((x, idx) => (
+                                  <li key={idx}>{x}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+      )}
+
+      <div ref={printRef} className="hidden print:block space-y-3 text-[12px] leading-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="font-semibold text-[14px]">Análisis de Trabajo Seguro</div>
+          <img
+            src={companyLogoSrc}
+            alt="Logo compañía"
+            style={{ height: "50px", width: "auto", objectFit: "contain" }}
+          />
+        </div>
+
+        <div className="border border-black">
+          <div className="grid grid-cols-3">
+            <div className="p-2 border-r border-black">
+              <div className="font-semibold">Gestión de HSSEQ</div>
+              <div className="text-xs">Título del Sistema</div>
+            </div>
+            <div className="p-2 border-r border-black">
+              <div className="font-semibold">Análisis de Trabajo Seguro</div>
+              <div className="text-xs">Nombre del Formato</div>
+            </div>
+            <div className="p-2">
+              <div className="font-semibold">02-01-102-F001</div>
+              <div className="text-xs">N.º del Formato</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 border-t border-black">
+            <div className="p-2 border-r border-black">
+              <div className="text-xs">Fecha Emisión</div>
+              <div className="font-semibold">04 septiembre 2024</div>
+            </div>
+            <div className="p-2 border-r border-black">
+              <div className="text-xs">N.º de Revisión</div>
+              <div className="font-semibold">07</div>
+            </div>
+            <div className="p-2 border-r border-black">
+              <div className="text-xs">Preparado por</div>
+              <div className="font-semibold">HSSEQ</div>
+            </div>
+            <div className="p-2">
+              <div className="text-xs">Aprobado por</div>
+              <div className="font-semibold">RAS</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border border-black p-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <b>N° ATS:</b> {atsNumber || "—"}
+            </div>
+            <div>
+              <b>N° Permiso de trabajo:</b> {permitNumber || "—"}
+            </div>
+            <div>
+              <b>Fecha de elaboración:</b> {elabDatePrint || "—"}
+            </div>
+            <div>
+              <b>Fecha de ejecución:</b> {execDatePrint || "—"}
+            </div>
+            <div>
+              <b>Versión:</b> {formatVersion || "—"}
+            </div>
+            <div>
+              <b>Frente de trabajo:</b> {workFront || "—"}
+            </div>
+            <div className="col-span-2">
+              <b>Trabajo por desarrollar:</b> {jobTitle || atsResult?.meta?.title || "—"}
+            </div>
+            <div className="col-span-2">
+              <b>Código del Procedimiento relacionado:</b> {procedureCodeRelated || "—"}
+            </div>
+          </div>
+
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div>
+              <b>Incidentes en trabajos similares:</b> {incidentsReference || "—"}
+            </div>
+            <div>
+              <b>Otras compañías:</b> {otherCompanies || "—"}
+            </div>
+          </div>
+
+          <div className="mt-2">
+            <b>Referencia normativa:</b> {normReference.trim() || "—"}
+          </div>
+        </div>
+
+        <div className="border border-black p-2 space-y-2">
+          <div>
+            <div className="font-semibold">Tipos de peligros para ejecutar el trabajo</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {PELIGROS_TIPOS.map((p) => (
+                <div key={p}>
+                  [{dangerTypes.includes(p) ? "X" : " "}] {p}
+                </div>
+              ))}
+              {dangerTypes.includes("Otros") && (
+                <div>
+                  <b>Otros:</b> {dangerTypesOther || "—"}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="font-semibold">PELIGROS DEL ENTORNO (Periféricos)</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {PELIGROS_ENTORNO.map((p) => (
+                <div key={p}>
+                  [{environmentDangers.includes(p) ? "X" : " "}] {p}
+                </div>
+              ))}
+              {environmentDangers.includes("Otros") && (
+                <div>
+                  <b>Otros:</b> {environmentDangersOther || "—"}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="font-semibold">SITUACIONES DE EMERGENCIA POTENCIALES</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {EMERGENCIAS.map((p) => (
+                <div key={p}>
+                  [{emergencies.includes(p) ? "X" : " "}] {p}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="border border-black p-2">
+          <div className="font-semibold">Resumen generado (ATS Inteligente)</div>
+          <div className="mt-1">
+            <b>Empresa:</b> {company || atsResult?.meta?.company || "—"} · <b>Ubicación:</b>{" "}
+            {location || atsResult?.meta?.location || "—"} · <b>Turno:</b>{" "}
+            {shift || atsResult?.meta?.shift || "—"}
+          </div>
+
+          <div className="mt-2">
+            <b>Peligros identificados:</b>
+            {hazardsList.length ? (
+              <ul className="list-disc pl-5 mt-1">
+                {hazardsList.map((h, i) => (
+                  <li key={i}>{h}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className="mt-1">—</div>
+            )}
+          </div>
+
+          <div className="mt-2">
+            <b>Controles (ingeniería / administrativos / EPP):</b>
+            <div className="grid grid-cols-3 gap-2 mt-1">
+              <div>
+                <div className="font-semibold">Ingeniería</div>
+                {ctrlEng.length ? (
+                  <ul className="list-disc pl-5">{ctrlEng.map((c, i) => <li key={i}>{c}</li>)}</ul>
+                ) : (
+                  <div>—</div>
+                )}
+              </div>
+              <div>
+                <div className="font-semibold">Administrativos</div>
+                {ctrlAdm.length ? (
+                  <ul className="list-disc pl-5">{ctrlAdm.map((c, i) => <li key={i}>{c}</li>)}</ul>
+                ) : (
+                  <div>—</div>
+                )}
+              </div>
+              <div>
+                <div className="font-semibold">EPP</div>
+                {ctrlPpe.length ? (
+                  <ul className="list-disc pl-5">{ctrlPpe.map((c, i) => <li key={i}>{c}</li>)}</ul>
+                ) : (
+                  <div>—</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border border-black p-2">
+          <div className="font-semibold">Equipamiento de Seguridad para realizar este trabajo</div>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+            {EQUIPO_SEGURIDAD.map((p) => (
+              <div key={p}>
+                [{safetyEquipment.includes(p) ? "X" : " "}] {p}
+              </div>
+            ))}
+            {safetyEquipment.includes("Otros") && (
+              <div>
+                <b>Otros:</b> {safetyEquipmentOther || "—"}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border border-black p-2">
+          <div className="font-semibold">Marcar Acuerdos de vida aplicables</div>
+          <div className="mt-1 grid grid-cols-2 gap-x-6 gap-y-1">
+            {ACUERDOS_DE_VIDA.map((p) => (
+              <div key={p}>
+                [{lifeSavingRules.includes(p) ? "X" : " "}] {p}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-2 font-semibold text-red-700">
+            Deténgase y busque ayuda si alguno de los controles/acciones anteriores no se ha
+            implementado
+          </div>
+        </div>
+
+        <div className="border border-black p-2">
+          <div className="font-semibold">AUTORIZACIÓN DE LOS EJECUTANTES PARA EL INICIO DEL TRABAJO</div>
+          <div className="mt-1 text-xs">
+            <b>No comenzaré a trabajar hasta confirmar que…</b>
+          </div>
+
+          <div className="mt-2 border border-black">
+            <div className="grid grid-cols-2">
+              <div className="p-2 border-r border-black font-semibold">Nombre</div>
+              <div className="p-2 font-semibold">Firma</div>
+            </div>
+            {executants.map((ex, idx) => (
+  <div key={idx} className="grid grid-cols-2 border-t border-black">
+    <div className="p-2 border-r border-black">
+      {ex.name || "-"}
+    </div>
+
+    <div className="p-2">
+      {(ex as any).remoteSignature ? (
+        <img
+          src={(ex as any).remoteSignature}
+          alt={`Firma ${ex.name || "ejecutante"}`}
+          className="max-h-[80px] w-auto object-contain"
+        />
+      ) : (
+        ex.signature || "-"
+      )}
+    </div>
+  </div>
+))}
+          </div>
+
+          <div className="mt-3 font-semibold">Verificador de inicio del trabajo (Supervisor de área)</div>
+
+          <div className="mt-2 border border-black">
+            <div className="grid grid-cols-4">
+              <div className="p-2 border-r border-black font-semibold">Chequeo</div>
+              <div className="p-2 border-r border-black font-semibold text-center">SI</div>
+              <div className="p-2 border-r border-black font-semibold text-center">NO</div>
+              <div className="p-2 font-semibold text-center">N.A.</div>
+            </div>
+
+            {[
+              ["Tengo claridad de todas las etapas del trabajo a ejecutar", checkStagesClarity],
+              ["Se han identificado y controlado todos los peligros y es seguro comenzar", checkHazardsControlled],
+              ["He confirmado el aislamiento de todas las fuentes de energías peligrosas", checkIsolationConfirmed],
+              ["Se han acordado responsabilidades y canales de comunicación del equipo", checkCommsAgreed],
+              ["Cuento con herramientas y equipos necesarios en buenas condiciones", checkToolsOk],
+            ].map(([label, val], i) => (
+              <div key={i} className="grid grid-cols-4 border-t border-black">
+                <div className="p-2 border-r border-black">{label as string}</div>
+                <div className="p-2 border-r border-black text-center">{boxByVal(val as string, "SI")}</div>
+                <div className="p-2 border-r border-black text-center">{boxByVal(val as string, "NO")}</div>
+                <div className="p-2 text-center">{boxByVal(val as string, "N.A.")}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <div>
+              <b>Nombre:</b> {supervisorName || "—"}
+            </div>
+            <div>
+              <b>Función:</b> {supervisorRole || "—"}
+            </div>
+            <div>
+              <b>Firma:</b>{" "}
+              {supervisorSignature ? (
+                <img
+                  src={supervisorSignature}
+                  alt="Firma supervisor"
+                  style={{ maxHeight: "50px", width: "auto", objectFit: "contain" }}
+                />
+              ) : (
+                "—"
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 font-semibold">Persona que aprueba el ATS</div>
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            <div>
+              <b>Nombre:</b> {approverName || "—"}
+            </div>
+            <div>
+              <b>Firma:</b>{" "}
+              {approverSignature ? (
+                <img
+                  src={approverSignature}
+                  alt="Firma aprobador"
+                  style={{ maxHeight: "50px", width: "auto", objectFit: "contain" }}
+                />
+              ) : (
+                "Pendiente por aprobación remota"
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 border-t border-black pt-3">
+            <div className="font-semibold">Resumen para charla preturno</div>
+
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div>
+                <b>Trabajo:</b> {jobTitle || atsResult?.meta?.title || "—"}
+              </div>
+              <div>
+                <b>Decisión Stop Work:</b> {atsResult?.stop_work?.decision || "—"}
+              </div>
+              <div className="col-span-2">
+                <b>Mensaje clave:</b> Si alguna condición cambia o un control no está implementado →{" "}
+                <b>DETENER</b> y re-evaluar.
+              </div>
+            </div>
+
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <div className="border border-black p-2">
+                <div className="font-semibold">Peligros críticos (Top)</div>
+                {topHazards.length ? (
+                  <ul className="list-disc pl-5 mt-1">
+                    {topHazards.map((h, i) => (
+                      <li key={i}>{h}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="mt-1">—</div>
+                )}
+              </div>
+
+              <div className="border border-black p-2">
+                <div className="font-semibold">Controles clave (Top)</div>
+                {topControls.length ? (
+                  <ul className="list-disc pl-5 mt-1">
+                    {topControls.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="mt-1">—</div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 border border-black p-2">
+              <div className="font-semibold">Pasos críticos (resumen)</div>
+              {topSteps.length ? (
+                <ol className="list-decimal pl-5 mt-1">
+                  {topSteps.map((s, i) => (
+                    <li key={i}>{String(s?.step || "").trim() || `Paso ${i + 1}`}</li>
+                  ))}
+                </ol>
+              ) : (
+                <div className="mt-1">—</div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 border border-black p-2">
+            <div className="font-semibold">Lista de verificación de supervisión (preturno)</div>
+
+            <div className="mt-2 border border-black">
+              <div className="grid grid-cols-4">
+                <div className="p-2 border-r border-black font-semibold">Ítem</div>
+                <div className="p-2 border-r border-black font-semibold text-center">SI</div>
+                <div className="p-2 border-r border-black font-semibold text-center">NO</div>
+                <div className="p-2 font-semibold text-center">N.A.</div>
+              </div>
+
+              {supervisionChecklistRows.map((txt, i) => (
+                <div key={i} className="grid grid-cols-4 border-t border-black">
+                  <div className="p-2 border-r border-black">{txt}</div>
+                  <div className="p-2 border-r border-black text-center">[ ]</div>
+                  <div className="p-2 border-r border-black text-center">[ ]</div>
+                  <div className="p-2 text-center">[ ]</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2 text-[11px]">
+              <b>Resultado del verificador (supervisor):</b> Claridad etapas = [{box(checkStagesClarity === "SI")}] SI / [
+              {box(checkStagesClarity === "NO")}] NO / [{box(checkStagesClarity === "N.A.")}] N.A. · Peligros controlados
+              = [{box(checkHazardsControlled === "SI")}] SI / [{box(checkHazardsControlled === "NO")}] NO / [
+              {box(checkHazardsControlled === "N.A.")}] N.A. · Aislamiento = [{box(checkIsolationConfirmed === "SI")}] SI / [
+              {box(checkIsolationConfirmed === "NO")}] NO / [{box(checkIsolationConfirmed === "N.A.")}] N.A. · Comunicación
+              = [{box(checkCommsAgreed === "SI")}] SI / [{box(checkCommsAgreed === "NO")}] NO / [
+              {box(checkCommsAgreed === "N.A.")}] N.A. · Herramientas OK = [{box(checkToolsOk === "SI")}] SI / [
+              {box(checkToolsOk === "NO")}] NO / [{box(checkToolsOk === "N.A.")}] N.A.
+            </div>
+          </div>
+        </div>
+
+        <div className="border border-black p-2">
+          <div className="font-semibold">Etapas del trabajo a ejecutar (generadas)</div>
+          {stepsList.length === 0 ? (
+            <div className="mt-2">—</div>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {stepsList.map((s, i) => (
+                <div key={i} className="border border-black p-2">
+                  <div className="font-semibold">
+                    {i + 1}. {String(s.step || `Paso ${i + 1}`)}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    <div>
+                      <div className="font-semibold">Riesgos Potenciales</div>
+                      {uniqueNonEmpty(s.hazards).length ? (
+                        <ul className="list-disc pl-5 mt-1">
+                          {uniqueNonEmpty(s.hazards).map((h, idx) => (
+                            <li key={idx}>{h}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="mt-1">—</div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-semibold">Acciones / Controles</div>
+                      {uniqueNonEmpty(s.controls).length ? (
+                        <ul className="list-disc pl-5 mt-1">
+                          {uniqueNonEmpty(s.controls).map((c, idx) => (
+                            <li key={idx}>{c}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="mt-1">—</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="text-[10px] text-neutral-700">
+          “Descargar PDF” abre el diálogo de impresión del navegador: selecciona “Guardar como PDF”.
+        </div>
+      </div>
+      {atsResult && (
+      <section className="no-print border rounded p-4 space-y-3">
+        <div className="font-semibold">Autorización y verificación (Formato 
+        Estrella)</div>
+        <div className="border rounded p-3">
+          <div className="font-medium">Ejecutantes</div>
+          <div className="mt-2 space-y-2">
+            {executants.map((ex, idx) => (
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <input
+                  placeholder={`Nombre ejecutante ${idx + 1}`}
+                  value={ex.name}
+                  onChange={(e) =>
+                    setExecutants((prev) => {
+                      const next = [...prev];
+                      next[idx] = { ...next[idx], name: e.target.value };
+                      return next;
+                    })
+                  }
+                  className="border p-2 rounded"
+                />
+                <input
+                  placeholder="# de whatsapp para firma"
+                  value={ex.signature}
+                  onChange={(e) =>
+                    setExecutants((prev) => {
+                      const next = [...prev];
+                      next[idx] = { ...next[idx], signature: e.target.value };
+                      return next;
+                    })
+                  }
+                  className="border p-2 rounded"
+                />
+{(ex as any).remoteSignature && (
+  <div className="border rounded p-2 bg-green-50 mt-2">
+    <div className="text-xs text-green-700 mb-1">
+      Firma remota registrada
+    </div>
+
+    <img
+      src={(ex as any).remoteSignature}
+      alt={`Firma ${ex.name || "ejecutante"}`}
+      className="max-h-[80px] w-auto object-contain bg-white border rounded"
+    />
+  </div>
+)}
+              </div>
+
+            ))}
+
+            <button
+              type="button"
+              className="px-3 py-2 border rounded text-sm"
+              onClick={() => setExecutants((prev) => [...prev, { name: "", signature: "" }])}
+            >
+              + Agregar ejecutante
+            </button>
+          </div>
+<section className="no-print border rounded p-4 space-y-3 bg-emerald-50 border-emerald-200">
+    <div className="font-semibold">Firma remota de ejecutantes</div>
+
+    <div className="text-sm text-neutral-700">
+      Genera un enlace para que los ejecutantes registren su firma desde el celular.
+    </div>
+
+    <button
+      type="button"
+      onClick={handleCreateExecutantSignLink}
+      disabled={creatingExecutantLink}
+      className="px-4 py-2 bg-green-700 text-white rounded disabled:opacity-50"
+    >
+      {creatingExecutantLink
+        ? "Generando..."
+        : savedAtsId ? "Generar links de firma" : "Guardar ATS y generar links de firma"}
+    </button>
+
+    {executantSignLink && (
+      <div className="border rounded bg-white p-3 text-sm break-all">
+        {executantSignLink}
+      </div>
+    )}
+{executantSignLinks.length > 0 && (
+  <div className="space-y-2">
+    {executantSignLinks.map((item: any, idx: number) => {
+      const phone = String(item.phone || "").replace(/\D/g, "");
+      const message =
+        `Hola ${item.name || ""}, por favor registra tu firma como ejecutante del ATS:\n\n${item.signUrl}`;
+
+      return (
+        <div
+          key={`${item.token || idx}`}
+          className="border rounded bg-white p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2"
+        >
+          <div className="text-sm">
+            <div className="font-medium">{item.name || `Ejecutante ${idx + 1}`}</div>
+            <div className="text-neutral-600 break-all">{item.signUrl}</div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              window.open(
+                `https://wa.me/57${phone}?text=${encodeURIComponent(message)}`,
+                "_blank",
+                "noopener,noreferrer"
+              )
+            }
+            className="px-4 py-2 bg-green-700 text-white rounded"
+          >
+            Enviar WhatsApp
+          </button>
+        </div>
+      );
+    })}
+  </div>
+)}
+  </section>
+
+        </div>
+
+        <div className="border rounded p-3">
+          <div className="font-medium">Supervisor verificador</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+            <input
+              placeholder="Nombre"
+              value={supervisorName}
+              onChange={(e) => setSupervisorName(e.target.value)}
+              className="border p-2 rounded"
+            />
+            <input
+              placeholder="Función"
+              value={supervisorRole}
+              onChange={(e) => setSupervisorRole(e.target.value)}
+              className="border p-2 rounded"
+            />
+          </div>
+
+          <div className="mt-3">
+<div className="text-sm text-neutral-600 mb-2">
+  Firmas ejecutantes: {signedCountToShow} / {requiredCountToShow}
+</div>
+          {allExecutantsSigned ? (
+  <SignaturePadField
+    label="Firma del supervisor"
+    value={supervisorSignature}
+    onChange={setSupervisorSignature}
+  />
+) : (
+  <div className="border rounded p-3 bg-yellow-50 text-sm text-yellow-800">
+    Primero deben firmar todos los ejecutantes para habilitar la firma del supervisor.
+  </div>
+)}
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
+            {[
+              ["Claridad de todas las etapas", checkStagesClarity, setCheckStagesClarity],
+              ["Peligros identificados y controlados", checkHazardsControlled, setCheckHazardsControlled],
+              ["Aislamiento energías peligrosas confirmado", checkIsolationConfirmed, setCheckIsolationConfirmed],
+              ["Responsabilidades y comunicación acordadas", checkCommsAgreed, setCheckCommsAgreed],
+              ["Herramientas/equipos en buenas condiciones", checkToolsOk, setCheckToolsOk],
+            ].map(([label, value, setter], idx) => (
+              <div key={idx} className="border rounded p-2">
+                <div className="font-medium">{label as string}</div>
+                <div className="mt-2 flex flex-wrap gap-4">
+                  {(["SI", "NO", "N.A."] as const).map((v) => (
+                    <label key={v} className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name={`supcheck_${idx}`}
+                        checked={value === v}
+                        onChange={() => (setter as any)(v)}
+                      />
+                      {v}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      )}
+      {atsResult && savedAtsId && allExecutantsSigned && supervisorSignatureToShow && (
+        <section className="no-print border rounded p-4 space-y-4 bg-blue-50 border-blue-200">
+          <div className="font-semibold">Aprobación remota</div>
+          <div className="text-sm text-neutral-700">
+            Después de guardar y firmar como supervisor, puedes seleccionar el aprobador y generar
+            el link para aprobación remota.
+          </div>
+
+          <div className="border rounded p-3 bg-white">
+            <div className="font-medium">Aprobador del ATS</div>
+
+            <div className="grid grid-cols-1 gap-2 mt-2">
+              <label className="text-sm font-medium">Seleccionar aprobador</label>
+              <select
+                value={selectedApproverId}
+                onChange={(e) => setSelectedApproverId(e.target.value)}
+                className="border p-2 rounded"
+              >
+                <option value="">Seleccione un aprobador</option>
+                {approvers.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} — {a.role}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
+              <input
+                value={approverName}
+                readOnly
+                placeholder="Nombre"
+                className="border p-2 rounded bg-neutral-50"
+              />
+              <input
+                value={approverEmail}
+                readOnly
+                placeholder="Correo"
+                className="border p-2 rounded bg-neutral-50"
+              />
+              <input
+                value={approverPhone}
+                readOnly
+                placeholder="Celular"
+                className="border p-2 rounded bg-neutral-50"
+              />
+            </div>
+
+            <div className="mt-2 text-xs text-neutral-600">
+              El aprobador seleccionado recibirá el enlace por correo y también podrás compartirlo por WhatsApp.
+            </div>
+
+            <div className="mt-3 border rounded p-3 bg-neutral-50">
+              <div className="text-sm font-medium">Firma del aprobador</div>
+              <div className="text-sm text-neutral-600 mt-1">
+                La firma del aprobador se realiza únicamente desde el link de aprobación remota.
+              </div>
+
+              {approverSignature ? (
+                <div className="mt-3 border rounded p-2 bg-white">
+                  <div className="text-xs text-neutral-600 mb-2">Firma registrada</div>
+                  <img
+                    src={approverSignature}
+                    alt="Firma del aprobador"
+                    className="max-h-[100px] w-auto object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="mt-3 text-xs text-neutral-500">
+                  Aún no se ha registrado la firma remota del aprobador.
+                </div>
+              )}
+            </div>
+          </div>
+<div className="flex flex-wrap gap-2">
+  <button
+    type="button"
+    onClick={handlePrepareApproverLink}
+    disabled={preparingApproverLink || sendingApprovalEmail}
+    className="px-4 py-2 bg-green-700 text-white rounded disabled:opacity-50"
+  >
+    {preparingApproverLink
+      ? "Generando..."
+      : sendingApprovalEmail
+      ? "Enviando..."
+      : "Enviar aprobación por WhatsApp"}
+  </button>
+
+  <button
+    type="button"
+    onClick={refreshSavedATS}
+    disabled={!savedAtsId}
+    className="px-4 py-2 border rounded disabled:opacity-50"
+  >
+    Refrescar ATS
+  </button>
+</div>
+
+          {approverLink && (
+            <div className="border rounded bg-white p-3 text-sm break-all">
+              {approverLink}
+            </div>
+          )}
+        </section>
+      )}
+
+
+      {adminUnlocked && (
+        <section className="no-print border rounded p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold">Historial de ATS guardados</div>
+              <div className="text-sm text-neutral-600">
+                Últimos registros almacenados en Supabase
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={loadATSHistory}
+              disabled={loadingHistory}
+              className="px-4 py-2 border rounded disabled:opacity-50"
+            >
+              {loadingHistory ? "Actualizando..." : "Actualizar"}
+            </button>
+          </div>
+
+          {loadingHistory ? (
+            <div className="text-sm text-neutral-600">Cargando historial...</div>
+          ) : atsHistory.length === 0 ? (
+            <div className="text-sm text-neutral-600">No hay ATS guardados todavía.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border rounded text-sm">
+                <thead className="bg-neutral-100">
+                  <tr>
+                    <th className="text-left p-2 border-b">Fecha guardado</th>
+                    <th className="text-left p-2 border-b">Trabajo</th>
+                    <th className="text-left p-2 border-b">Empresa</th>
+                    <th className="text-left p-2 border-b">Ubicación</th>
+                    <th className="text-left p-2 border-b">Stop Work</th>
+                    <th className="text-left p-2 border-b">Peligros</th>
+                    <th className="text-left p-2 border-b">Controles</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {atsHistory.map((item) => (
+                    <tr key={item.id} className="border-b">
+                      <td className="p-2">
+                        {item.created_at ? new Date(item.created_at).toLocaleString() : "—"}
+                      </td>
+                      <td className="p-2">{item.job_title || "—"}</td>
+                      <td className="p-2">{item.company || "—"}</td>
+                      <td className="p-2">{item.location || "—"}</td>
+                      <td className="p-2">{item.stop_work_decision || "—"}</td>
+                      <td className="p-2">{item.hazards_count ?? 0}</td>
+                      <td className="p-2">{item.controls_count ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+  {atsResult && (
+        <div className="no-print border-t pt-6 space-y-3">
+          {savedAtsCode && (
+            <div className="text-sm font-semibold text-green-700">
+              Código ATS: {savedAtsCode}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={handleSaveATS}
+              disabled={savingATS}
+              className="px-6 py-2 border rounded disabled:opacity-50"
+            >
+              {savingATS ? "Guardando..." : "Guardar ATS"}
+            </button>
+
+            <button
+              type="button"
+              onClick={refreshSavedATS}
+              disabled={!savedAtsId}
+              className="px-6 py-2 border rounded disabled:opacity-50"
+            >
+              Refrescar ATS
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handlePrintToPdf()}
+              className="px-6 py-2 bg-black text-white rounded"
+            >
+              Descargar PDF
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )}
+    </div>
+  </main>
+);
+}
