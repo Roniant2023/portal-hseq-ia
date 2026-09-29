@@ -309,6 +309,12 @@ const companyConfig = getCompanyConfig();
 return (
   <main className="min-h-screen bg-white text-neutral-900">
     <div className="max-w-5xl mx-auto p-6 space-y-6 bg-white">
+<Link
+  href="/control-trabajo"
+  className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900"
+>
+  ← Volver a Control de Trabajo
+</Link>
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold">SOE Inteligente</h1>

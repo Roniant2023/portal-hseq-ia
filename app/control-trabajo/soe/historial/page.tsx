@@ -48,6 +48,12 @@ const companyConfig = getCompanyConfig();
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
+<Link
+  href="/control-trabajo/soe"
+  className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900"
+>
+  ← Volver al SOE
+</Link>
       {/* 🔥 SOLO MODIFICAMOS ESTE BLOQUE */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
