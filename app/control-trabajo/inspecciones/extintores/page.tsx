@@ -189,7 +189,7 @@ async function loadExtinguishers() {
     .from("fire_extinguishers")
     .select("*")
     .order("created_at", { ascending: false });
-
+console.log("EXTINTORES SUPABASE:", { data, error, cantidad: data?.length });
   if (error) {
     setUiError(error.message);
     return;

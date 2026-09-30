@@ -97,7 +97,11 @@ type ReposicionAprobada = {
     nombres: string;
     apellidos: string;
   } | null;
-
+  inventario: {
+    talla: string | null;
+    lote: string | null;
+    serial: string | null;
+  } | null;
   epp: {
     codigo: string;
     nombre: string;
@@ -302,9 +306,10 @@ const [reposicionPendienteFirma, setReposicionPendienteFirma] =
     setCargando(false);
   }
 
- useEffect(() => {
+useEffect(() => {
   cargarDatos();
   cargarReposicionesAprobadas();
+  cargarEntregaPendienteFirma();
 }, []);
 
   const trabajadoresFiltrados = useMemo(() => {
@@ -421,9 +426,14 @@ async function cargarReposicionesAprobadas() {
         nombres,
         apellidos
       ),
-      epp:epp_catalogo (
+            epp:epp_catalogo (
         codigo,
         nombre
+      ),
+      inventario:epp_inventario (
+        talla,
+        lote,
+        serial
       ),
       ubicacion:epp_ubicaciones (
         nombre
@@ -459,9 +469,78 @@ async function cargarReposicionesAprobadas() {
       new Date().toLocaleDateString("en-CA");
   });
 
-  setResponsableReposicion(responsablesIniciales);
-  setFechaReposicion(fechasIniciales);
+ setResponsableReposicion(responsablesIniciales);
+setFechaReposicion(fechasIniciales);
 }
+
+async function cargarEntregaPendienteFirma() {
+  const { data, error: errorPendiente } = await supabase
+    .from("epp_reposiciones")
+    .select(`
+      id,
+      fecha_solicitud,
+      fecha_entrega_solicitada,
+      cantidad_solicitada,
+      motivo,
+      justificacion,
+      responsable_entrega_sugerido,
+      nueva_entrega_id,
+      trabajador:epp_trabajadores (
+        identificacion,
+        nombres,
+        apellidos
+      ),
+      epp:epp_catalogo (
+        codigo,
+        nombre
+      ),
+      inventario:epp_inventario (
+        talla,
+        lote,
+        serial
+      ),
+      ubicacion:epp_ubicaciones (
+        nombre
+      ),
+      entrega:epp_entregas!epp_reposiciones_nueva_entrega_id_fkey (
+        id,
+        estado
+      )
+    `)
+    .in("estado", ["PENDIENTE", "APROBADA"])
+    .not("nueva_entrega_id", "is", null)
+    .eq("entrega.estado", "BORRADOR")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (errorPendiente) {
+    console.error(
+      "ERROR CONSULTANDO ENTREGA PENDIENTE DE FIRMA:",
+      errorPendiente
+    );
+    return;
+  }
+
+  if (!data?.nueva_entrega_id) {
+    return;
+  }
+
+  setEntregaPendienteFirmaId(data.nueva_entrega_id);
+
+  setReposicionPendienteFirma(
+    data as unknown as ReposicionAprobada
+  );
+
+  setNombreRecibeFirma(
+    data.trabajador
+      ? `${data.trabajador.nombres} ${data.trabajador.apellidos}`
+      : ""
+  );
+
+  setFirmaEntrega(null);
+}
+
 async function cargarEppEntregadosAnteriormente(trabajadorIdConsulta: string) {
   setEppEntregadosAnteriormente([]);
   setEntregaOriginalId("");
@@ -737,12 +816,22 @@ async function guardarFirmaEntrega() {
       );
     }
 
-setMensaje("Firma registrada correctamente.");
+setMensaje("Entrega confirmada y firma registrada correctamente.");
 
 setFirmaEntrega(null);
 setEntregaPendienteFirmaId("");
 setNombreRecibeFirma("");
 setReposicionPendienteFirma(null);
+
+// Limpiar la entrega únicamente después de que
+// la firma haya sido registrada correctamente.
+setItems([]);
+setInventarioSeleccionado("");
+setCantidad("1");
+setObservaciones("");
+setFotosReposicion([]);
+
+await cargarDatos();
   } catch (errorFirma: any) {
     console.error(
       "ERROR REGISTRANDO FIRMA DE EPP:",
@@ -1147,14 +1236,18 @@ if (data) {
   setFirmaEntrega(null);
 }
 }
-    setItems([]);
-    setInventarioSeleccionado("");
-    setCantidad("1");
-    setObservaciones("");
-setFotosReposicion([]);
-    await cargarDatos();
+   if (motivo === "REPOSICION" && reposicionRequiereAprobacion) {
+  // La solicitud quedó enviada a aprobación.
+  // En este caso no existe una entrega pendiente de firma.
+  setItems([]);
+  setInventarioSeleccionado("");
+  setCantidad("1");
+  setObservaciones("");
+  setFotosReposicion([]);
+  await cargarDatos();
+}
 
-    setGuardando(false);
+setGuardando(false);
   }
 
   return (
@@ -1186,18 +1279,19 @@ setFotosReposicion([]);
        ) : reposicionPendienteFirma && entregaPendienteFirmaId ? (
   <section className="rounded-3xl border border-blue-200 bg-blue-50/40 p-6 md:p-8 shadow-sm">
 
-    <div className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
-      ENTREGA REALIZADA
-    </div>
+    <div className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
+  ENTREGA PENDIENTE DE FIRMA
+</div>
 
-    <h2 className="mt-4 text-3xl font-black text-neutral-950">
-      Firma de recibido
-    </h2>
+<h2 className="mt-4 text-3xl font-black text-neutral-950">
+  Firma de recibido
+</h2>
 
-    <p className="mt-2 text-neutral-600">
-      La entrega ya fue registrada. Verifica la información antes de que
-      el trabajador firme el recibido.
-    </p>
+<p className="mt-2 text-neutral-600">
+  Verifica los elementos que recibirá el trabajador antes de registrar
+  la firma. El inventario se actualizará únicamente después de confirmar
+  la entrega mediante la firma.
+</p>
 
     <div className="mt-6 rounded-2xl border border-neutral-200 bg-white p-5">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1233,7 +1327,20 @@ setFotosReposicion([]);
           titulo="Cantidad"
           valor={String(reposicionPendienteFirma.cantidad_solicitada)}
         />
+<Dato
+  titulo="Talla"
+  valor={reposicionPendienteFirma.inventario?.talla || "—"}
+/>
 
+<Dato
+  titulo="Lote"
+  valor={reposicionPendienteFirma.inventario?.lote || "—"}
+/>
+
+<Dato
+  titulo="Serial"
+  valor={reposicionPendienteFirma.inventario?.serial || "—"}
+/>
         <Dato
           titulo="Lugar de entrega"
           valor={reposicionPendienteFirma.ubicacion?.nombre || "—"}
@@ -1330,7 +1437,10 @@ setFotosReposicion([]);
                 <span className="font-bold">Ubicación:</span>{" "}
                 {reposicion.ubicacion?.nombre || "—"}
               </div>
-
+<div className="text-sm text-neutral-700">
+  <span className="font-bold">Talla:</span>{" "}
+  {reposicion.inventario?.talla || "—"}
+</div>
               <div className="text-sm text-neutral-700">
                 <span className="font-bold">Cantidad:</span>{" "}
                 {reposicion.cantidad_solicitada}

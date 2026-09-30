@@ -100,30 +100,52 @@ const [pendientesEntrega, setPendientesEntrega] =
         }
 
         setPuedeVer(true);
-const {
-  count: countPendientesEntrega,
-  error: errorPendientesEntrega,
-} = await supabase
-  .from("epp_reposiciones")
-  .select("id", {
-    count: "exact",
-    head: true,
-  })
-  .eq("estado", "APROBADA")
-  .eq("requiere_aprobacion", true)
-  .is("nueva_entrega_id", null);
+
+ const [
+  respuestaPendientesPreparar,
+  respuestaPendientesFirma,
+] = await Promise.all([
+  supabase
+    .from("epp_reposiciones")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq("estado", "APROBADA")
+    .eq("requiere_aprobacion", true)
+    .is("nueva_entrega_id", null),
+
+  supabase
+    .from("epp_entregas")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq("estado", "BORRADOR"),
+]);
 
 if (!activo) return;
 
-if (errorPendientesEntrega) {
+if (respuestaPendientesPreparar.error) {
   console.error(
-    "Error consultando entregas pendientes:",
-    errorPendientesEntrega
+    "Error consultando reposiciones pendientes de entrega:",
+    respuestaPendientesPreparar.error
   );
-} else {
-  setPendientesEntrega(countPendientesEntrega ?? 0);
 }
-        const {
+
+if (respuestaPendientesFirma.error) {
+  console.error(
+    "Error consultando entregas pendientes de firma:",
+    respuestaPendientesFirma.error
+  );
+}
+
+const totalPendientes =
+  (respuestaPendientesPreparar.count ?? 0) +
+  (respuestaPendientesFirma.count ?? 0);
+
+setPendientesEntrega(totalPendientes);        
+const {
           data: permisoAprobacion,
           error: errorPermisoAprobacion,
         } = await supabase.rpc(

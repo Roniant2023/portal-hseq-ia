@@ -278,6 +278,13 @@ export default function InventarioEppPage() {
   >
     🥽 Catálogo de EPP
   </a>
+
+  <a
+    href="/control-trabajo/epp/ubicaciones"
+    className="inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-5 py-3 font-bold text-neutral-900 hover:bg-neutral-50"
+  >
+    📍 Ubicaciones
+  </a>
 </div>
         </header>
 

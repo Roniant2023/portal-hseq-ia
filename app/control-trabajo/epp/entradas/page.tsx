@@ -281,6 +281,23 @@ if (ubicacionId === "OTRO" && !otraUbicacion.trim()) {
 
     setGuardando(true);
 
+const { data: empresaData, error: empresaError } = await supabase.rpc(
+  "mi_empresa"
+);
+
+const empresaActual = empresaData?.[0];
+
+if (empresaError || !empresaActual) {
+  console.error(empresaError);
+
+  setError(
+    "No fue posible identificar la empresa del usuario."
+  );
+
+  setGuardando(false);
+  return;
+}
+
 let ubicacionFinalId = ubicacionId;
 
 if (ubicacionId === "OTRO") {
@@ -303,9 +320,10 @@ if (ubicacionId === "OTRO") {
     } = await supabase
       .from("epp_ubicaciones")
       .insert({
-        nombre: nombreNuevaUbicacion,
-        activo: true,
-      })
+  empresa_id: empresaActual.id,
+  nombre: nombreNuevaUbicacion,
+  activo: true,
+})
       .select("id,nombre")
       .single();
 

@@ -29,7 +29,7 @@ const formularioInicial = {
   cargo: "",
   area_operacion: "",
   base: "",
-  empresa: "Estrella International Energy Services",
+  empresa: "",
   fecha_ingreso: "",
   talla_overol: "",
   talla_pantalon: "",
@@ -131,7 +131,25 @@ if (form.cargo === "OTRO" && !otroCargo.trim()) {
 }
     setGuardando(true);
 
-    const nuevoTrabajador = {
+const { data: empresaData, error: empresaError } = await supabase.rpc(
+  "mi_empresa"
+);
+
+const empresaActual = empresaData?.[0];
+
+if (empresaError || !empresaActual) {
+  console.error(empresaError);
+
+  setError(
+    "No fue posible identificar la empresa del usuario."
+  );
+
+  setGuardando(false);
+  return;
+}
+
+const nuevoTrabajador = {
+  empresa_id: empresaActual.id,
       identificacion: form.identificacion.trim(),
       nombres: form.nombres.trim().toUpperCase(),
       apellidos: form.apellidos.trim().toUpperCase(),
@@ -146,9 +164,7 @@ if (form.cargo === "OTRO" && !otroCargo.trim()) {
     ? otraBase.trim().toUpperCase() || null
     : form.base.trim() || null,
 
-      empresa:
-        form.empresa.trim() ||
-        "Estrella International Energy Services",
+     empresa: empresaActual.nombre,
 
       fecha_ingreso: form.fecha_ingreso || null,
 

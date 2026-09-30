@@ -76,7 +76,7 @@ export default function FichaTrabajadorPage() {
 
   const [entregas, setEntregas] =
     useState<Entrega[]>([]);
-
+const [firmasUrl, setFirmasUrl] = useState<Record<string, string>>({});
   const [reposiciones, setReposiciones] =
     useState<Reposicion[]>([]);
 
@@ -189,10 +189,36 @@ export default function FichaTrabajadorPage() {
 
         setEntregas([]);
       } else {
-        setEntregas(
-          (respuestaEntregas.data ?? []) as unknown as Entrega[]
-        );
-      }
+  const entregasCargadas =
+    (respuestaEntregas.data ?? []) as unknown as Entrega[];
+
+  setEntregas(entregasCargadas);
+
+  const nuevasFirmasUrl: Record<string, string> = {};
+
+  for (const entrega of entregasCargadas) {
+    if (!entrega.firma_url) continue;
+
+    const { data: firmaData, error: firmaError } =
+      await supabase.storage
+        .from("epp-firmas")
+        .createSignedUrl(entrega.firma_url, 3600);
+
+    if (firmaError) {
+      console.error(
+        `No fue posible cargar la firma de la entrega ${entrega.id}:`,
+        firmaError
+      );
+      continue;
+    }
+
+    if (firmaData?.signedUrl) {
+      nuevasFirmasUrl[entrega.id] = firmaData.signedUrl;
+    }
+  }
+
+  setFirmasUrl(nuevasFirmasUrl);
+}
 
       if (respuestaReposiciones.error) {
         console.error(
@@ -883,7 +909,31 @@ export default function FichaTrabajadorPage() {
                           }
                         </div>
                       )}
+{entrega.firma_url && (
+  <div className="mt-4 rounded-xl border border-neutral-200 bg-white p-4">
+    <div className="text-xs font-bold uppercase tracking-wide text-neutral-500">
+      Firma de recibido
+    </div>
 
+    {firmasUrl[entrega.id] ? (
+      <img
+        src={firmasUrl[entrega.id]}
+        alt={`Firma de recibido de ${entrega.recibido_por || "trabajador"}`}
+        className="mt-3 h-24 max-w-full object-contain object-left"
+      />
+    ) : (
+      <div className="mt-3 text-sm text-neutral-400">
+        Cargando firma...
+      </div>
+    )}
+
+    {entrega.recibido_por && (
+      <div className="mt-2 text-sm font-semibold text-neutral-700">
+        {entrega.recibido_por}
+      </div>
+    )}
+  </div>
+)}
                     </div>
                   );
                 }

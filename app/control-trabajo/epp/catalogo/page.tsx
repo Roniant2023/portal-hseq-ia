@@ -169,7 +169,23 @@ export default function CatalogoEppPage() {
 
     setGuardando(true);
 
-    const nuevoEpp = {
+const { data: empresaId, error: empresaError } = await supabase.rpc(
+  "mi_empresa_id"
+);
+
+if (empresaError || !empresaId) {
+  console.error(empresaError);
+
+  setError(
+    "No fue posible identificar la empresa del usuario."
+  );
+
+  setGuardando(false);
+  return;
+}
+
+const nuevoEpp = {
+  empresa_id: empresaId,
       codigo: form.codigo.trim().toUpperCase(),
       nombre: form.nombre.trim().toUpperCase(),
       categoria: form.categoria,
