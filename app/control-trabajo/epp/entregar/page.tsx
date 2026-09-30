@@ -523,23 +523,29 @@ async function cargarEntregaPendienteFirma() {
   }
 
   if (!data?.nueva_entrega_id) {
-    return;
-  }
-
-  setEntregaPendienteFirmaId(data.nueva_entrega_id);
-
-  setReposicionPendienteFirma(
-    data as unknown as ReposicionAprobada
-  );
-
-  setNombreRecibeFirma(
-    data.trabajador
-      ? `${data.trabajador.nombres} ${data.trabajador.apellidos}`
-      : ""
-  );
-
-  setFirmaEntrega(null);
+  return;
 }
+
+setEntregaPendienteFirmaId(data.nueva_entrega_id);
+
+const trabajadorNormalizado = Array.isArray(data.trabajador)
+  ? data.trabajador[0] ?? null
+  : data.trabajador ?? null;
+
+const reposicionNormalizada = {
+  ...data,
+  trabajador: trabajadorNormalizado,
+} as unknown as ReposicionAprobada;
+
+setReposicionPendienteFirma(reposicionNormalizada);
+
+setNombreRecibeFirma(
+  trabajadorNormalizado
+    ? `${trabajadorNormalizado.nombres} ${trabajadorNormalizado.apellidos}`
+    : ""
+);
+
+setFirmaEntrega(null);}
 
 async function cargarEppEntregadosAnteriormente(trabajadorIdConsulta: string) {
   setEppEntregadosAnteriormente([]);
